@@ -39,6 +39,7 @@ export interface Settings {
   lineNumbers: boolean;
   wrap: boolean;
   syncScroll: boolean;
+  sectionNav: boolean;
   split: number;
   problemsOpen: boolean;
   grammar: boolean;

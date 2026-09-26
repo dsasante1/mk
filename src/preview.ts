@@ -112,11 +112,11 @@ export class Preview {
     return curTop + ((line - cur.line) / (next.line - cur.line)) * (nextTop - curTop);
   }
 
-  /** The inverse: which source line sits at the pane's top. */
-  topLine(): number {
+  /** The inverse: which source line sits at the pane's top, or `offset` px below it. */
+  topLine(offset = 0): number {
     const b = this.blocks;
     if (b.length === 0) return 0;
-    const y = this.pane.scrollTop;
+    const y = this.pane.scrollTop + offset;
     let i = 0;
     while (i + 1 < b.length && this.top(b[i + 1].el) <= y) i++;
     const cur = b[i];

@@ -18,7 +18,9 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { api, type Issue, type Settings, type View } from "./api";
 import { Editor } from "./editor";
 import { Grammar, groupOf, GROUP_LABEL, ruleLabel, type Group } from "./grammar";
+import { headings } from "./markdown";
 import { Preview } from "./preview";
+import { SectionNav } from "./section-nav";
 import { SettingsDialog } from "./settings-ui";
 import { icons } from "./icons";
 import {
@@ -93,6 +95,7 @@ function applySettings(next: Settings) {
   setView(settings.view, false);
   setProblems(settings.problemsOpen, false);
   if (grammar && grammarWas !== settings.grammar) grammar.setEnabled(settings.grammar);
+  sectionNav.setEnabled(settings.sectionNav);
   updateStatus();
 }
 
@@ -139,11 +142,37 @@ function renderPreview() {
   if (settings.syncScroll && settings.view === "split") syncFrom("editor");
 }
 
+// ---------------------------------------------------------------- section rail
+//
+// It sits on the pane being read: the preview whenever it is showing, the
+// editor otherwise. Jumps land a little below the pane's top, as a heading
+// link in the preview does.
+
+const reading = () => settings.view === "edit" ? editor.view.scrollDOM : preview.pane;
+
+const sectionNav = new SectionNav($("section-nav"), {
+  scroller: reading,
+  lineAt: (offset) => settings.view === "edit" ? editor.topLine(offset) : preview.topLine(offset),
+  jump(line) {
+    if (settings.view === "edit") editor.scrollToLine(line, 16);
+    else {
+      holdJump();
+      preview.pane.scrollTo({ top: Math.max(0, preview.heightOfLine(line) - 16), behavior: "smooth" });
+    }
+  },
+});
+
+/** After an edit, a new document or a new view: preview first, so its layout is current. */
+function refresh() {
+  renderPreview();
+  sectionNav.set(headings(editor.text()));
+}
+
 function onUpdate(u: ViewUpdate) {
   if (u.docChanged) {
     grammar.changed(u.changes);
     window.clearTimeout(previewTimer);
-    previewTimer = window.setTimeout(renderPreview, 120);
+    previewTimer = window.setTimeout(refresh, 120);
     updateTitle();
   }
   if (u.docChanged || u.selectionSet) updateStatus();
@@ -154,8 +183,21 @@ function onUpdate(u: ViewUpdate) {
 // Each pane remembers the scrollTop we last set on it. A scroll event that
 // lands there is our own echo and is ignored; anything else is the user, and
 // drives the other pane. Without this the two panes chase each other.
+//
+// A jump from the section rail is a smooth scroll of the preview, and any
+// write to the preview's scrollTop cancels one. The editor's answer to being
+// synced is often a small scroll of its own (CodeMirror correcting a height it
+// had estimated), so while a jump is moving the editor follows but does not
+// steer.
 
 const expected = { editor: -1, preview: -1 };
+let jumping: number | undefined;
+
+/** Hold the editor to following until the preview has been still for a moment. */
+function holdJump() {
+  window.clearTimeout(jumping);
+  jumping = window.setTimeout(() => { jumping = undefined; }, 200);
+}
 
 function syncFrom(source: "editor" | "preview") {
   if (!settings.syncScroll || settings.view !== "split") return;
@@ -171,6 +213,11 @@ function syncFrom(source: "editor" | "preview") {
 }
 
 function onScroll(source: "editor" | "preview", el: HTMLElement) {
+  sectionNav.schedule();
+  if (jumping !== undefined) {
+    if (source === "editor") return;
+    holdJump();
+  }
   if (Math.abs(el.scrollTop - expected[source]) <= 2) { expected[source] = -1; return; }
   expected[source] = -1;
   syncFrom(source);
@@ -188,6 +235,7 @@ function setView(v: View, persist = true) {
   applySplit();
   if (v !== "edit") renderPreview();
   if (v !== "preview") editor?.view.requestMeasure();
+  sectionNav.schedule();
   if (persist) saveSettingsSoon();
 }
 
@@ -449,7 +497,9 @@ function loadDoc(path: string | null, content: string, mtime: number | null) {
   updateStatus();
   void grammar.reset(path);
   preview.pane.scrollTop = 0;
+  window.clearTimeout(previewTimer);
   if (settings.view !== "edit") preview.render(editor.text());
+  sectionNav.set(headings(editor.text()));
   editor.view.focus();
 }
 
@@ -690,6 +740,7 @@ async function boot() {
   editor.view.scrollDOM.addEventListener("scroll", () => onScroll("editor", editor.view.scrollDOM), { passive: true });
   preview.pane.addEventListener("scroll", () => onScroll("preview", preview.pane), { passive: true });
   window.addEventListener("keydown", onKey, true);
+  window.addEventListener("resize", () => sectionNav.schedule());
   document.addEventListener("mousedown", (e) => {
     if (qf && !(e.target as HTMLElement).closest("#quickfix")) closeQuickFix();
   });
