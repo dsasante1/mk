@@ -43,7 +43,7 @@ done
 # The launcher's absolute path, not `mk`: a desktop session's PATH is set at
 # login and often lacks ~/.local/bin, and an Exec that does not resolve is a
 # menu entry that silently does nothing.
-sed "s|^Exec=.*|Exec=env MK_FOREGROUND=1 $BINDIR/mk %f|" mk.desktop > "$APPDIR/mk.desktop"
+sed "s|^Exec=.*|Exec=env MK_FOREGROUND=1 $BINDIR/mk %F|" mk.desktop > "$APPDIR/mk.desktop"
 chmod 644 "$APPDIR/mk.desktop"
 
 command -v update-desktop-database >/dev/null && update-desktop-database "$APPDIR" || true

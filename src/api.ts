@@ -56,7 +56,7 @@ export interface Doc {
 }
 
 export interface Launch {
-  path: string | null;
+  paths: string[];
   view: View | null;
 }
 
