@@ -216,6 +216,15 @@ export class Editor {
     v.scrollDOM.scrollTop = top;
   }
 
+  /**
+   * Put back a state taken from `view.state` earlier, undo history and all:
+   * how a tab keeps its own. Settings may have changed while it was away.
+   */
+  restore(state: EditorState) {
+    this.view.setState(state);
+    this.apply(this.settings!);
+  }
+
   get doc(): Text { return this.view.state.doc; }
   text(): string { return this.view.state.doc.toString(); }
 
