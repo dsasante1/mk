@@ -1,0 +1,39 @@
+[package]
+name = "mk"
+version = "0.1.0"
+description = "A Markdown viewer and editor with Harper grammar checking built in."
+edition = "2021"
+rust-version = "1.85"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# `protocol-asset` is what lets the preview show an image that sits beside
+# the document: the webview cannot read file:// URLs, so a relative `src` is
+# rewritten to the asset protocol, scoped at open time to the document's own
+# folder rather than to the whole disk.
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Harper, as a library. Linking the engine rather than running `harper-ls`
+# beside the editor is the whole point of the app being standalone: nothing to
+# install, no server to find on PATH, no LSP round trip per keystroke. The
+# engine is the same one the language server wraps.
+harper-core = "2.11"
+
+# Dependencies are optimised even in a debug build. Harper builds its lint
+# group and reads its curated dictionary at startup; unoptimised, that is
+# seconds instead of a fraction of one, and every keystroke's lint is
+# measurably slower. The app's own crate stays unoptimised for backtraces.
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true

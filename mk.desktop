@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=mk
+GenericName=Markdown Editor
+Comment=Markdown viewer and editor with Harper grammar checking
+Exec=env MK_FOREGROUND=1 mk %f
+Icon=mk
+Terminal=false
+Categories=Office;TextEditor;Utility;
+MimeType=text/markdown;text/x-markdown;
+Keywords=markdown;md;grammar;spelling;harper;writing;
+StartupWMClass=mk

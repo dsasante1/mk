@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mk</title>
+  </head>
+  <body>
+    <div id="app">
+      <header id="topbar">
+        <div class="group">
+          <button class="icon" id="btn-new" data-tip="New (Ctrl+N)"></button>
+          <button class="icon" id="btn-open" data-tip="Open (Ctrl+O)"></button>
+          <button class="icon" id="btn-save" data-tip="Save (Ctrl+S)"></button>
+        </div>
+        <div id="docname">
+          <span id="doc-title">Untitled</span><span id="doc-dirty" title="Unsaved changes">●</span>
+          <span id="doc-dir"></span>
+        </div>
+        <div class="group">
+          <div class="seg" id="view-seg" role="tablist">
+            <button data-view="edit" data-tip="Editor only (Ctrl+1)">Edit</button>
+            <button data-view="split" data-tip="Editor and preview (Ctrl+2)">Split</button>
+            <button data-view="preview" data-tip="Preview only (Ctrl+3)">Preview</button>
+          </div>
+          <button id="btn-problems" data-tip="Harper issues (Ctrl+Shift+M)">
+            <span class="dot"></span><span id="problems-label">Harper</span>
+          </button>
+          <button class="icon" id="btn-theme" data-tip="Toggle theme"></button>
+          <button class="icon" id="btn-settings" data-tip="Settings (Ctrl+,)"></button>
+        </div>
+      </header>
+      <div id="banner" hidden></div>
+      <main id="workspace" data-view="split">
+        <section id="editor-pane"></section>
+        <div id="divider" role="separator" aria-orientation="vertical"></div>
+        <section id="preview-pane"><article id="preview" class="markdown-body"></article></section>
+        <aside id="problems" hidden>
+          <header>
+            <div id="problems-head"></div>
+            <button class="icon small" id="btn-problems-close" data-tip="Close"></button>
+          </header>
+          <div id="problem-filters"></div>
+          <div id="problem-list"></div>
+        </aside>
+      </main>
+      <footer id="statusbar">
+        <div class="group">
+          <span id="st-pos"></span>
+          <span id="st-words"></span>
+          <span id="st-read"></span>
+        </div>
+        <div class="group">
+          <button id="st-harper"></button>
+          <button id="st-dialect" data-tip="English dialect Harper checks against"></button>
+          <span id="st-eol"></span>
+          <span>Markdown</span>
+        </div>
+      </footer>
+    </div>
+    <div id="quickfix" hidden></div>
+    <dialog id="settings"></dialog>
+    <div id="toasts"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
