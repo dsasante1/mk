@@ -8,6 +8,7 @@ Harper runs inside the app as a library (`harper-core`), not as a language serve
 ./run.sh samples/tour.md        # build once (a few minutes), then open
 ./install.sh                    # put `mk` on your PATH and in "Open With"
 mk notes.md                     # edit
+mk a.md b.md c.md               # open several files, one tab each
 mk -v README.md                 # open in preview-only mode
 ```
 
@@ -16,6 +17,8 @@ mk -v README.md                 # open in preview-only mode
 **Editing.** A CodeMirror 6 editor set up for prose. Headings, emphasis, links and code are styled in place, fenced code is highlighted in its own language, and lists continue when you press Enter. It also has find and replace, multiple cursors and full undo history.
 
 **Viewing.** A live preview with GitHub-flavoured rendering: tables, task lists, strikethrough, autolinks, heading anchors, highlighted code, raw HTML (sanitised) and front matter. Images next to the document load from disk. The preview scrolls in step with the editor. You can tick a task in the preview and the editor changes with it. A link to another Markdown file opens that file in mk.
+
+**Several files at once.** Each open file gets a tab. Open several from the Open dialog, the command line or by dropping them on the window. A file that is already open is not opened twice. Each tab keeps its own undo history, cursor and scroll position. Click a tab or press Ctrl+Tab to switch between them. Click a tab's × (or middle-click the tab, or press Ctrl+W) to close it. A tab with unsaved changes shows a dot in place of the × and asks before it closes. Closing the window asks about every unsaved tab in turn.
 
 **Finding your place.** A short dash for each heading sits at the right edge of the page. The dash for the section you are reading is longer and coloured, and it moves as you scroll. Click a dash to go to its section, or hover over the dashes to see the headings by name. It works in the editor-only view too, and you can turn it off in Settings.
 
@@ -41,7 +44,9 @@ You can reach these actions by hovering an underline, pressing Ctrl+. on it, or 
 
 | Key | |
 | --- | --- |
-| Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Shift+S | New, open, save, save as |
+| Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Shift+S | New tab, open, save, save as |
+| Ctrl+Tab / Ctrl+Shift+Tab (or Ctrl+PageDown / PageUp) | Next / previous tab |
+| Ctrl+W | Close tab |
 | Ctrl+1 / Ctrl+2 / Ctrl+3 | Editor only, split, preview only |
 | Ctrl+Shift+V | Toggle preview only |
 | Ctrl+Shift+M | Harper issues panel |
@@ -56,7 +61,7 @@ You can reach these actions by hovering an underline, pressing Ctrl+. on it, or 
 | Ctrl+, | Settings |
 | Ctrl+Q | Quit (asks if there are unsaved changes) |
 
-You can also drop a file on the window to open it.
+You can also drop files on the window to open them.
 
 ## Settings
 

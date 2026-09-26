@@ -3,7 +3,7 @@ Type=Application
 Name=mk
 GenericName=Markdown Editor
 Comment=Markdown viewer and editor with Harper grammar checking
-Exec=env MK_FOREGROUND=1 mk %f
+Exec=env MK_FOREGROUND=1 mk %F
 Icon=mk
 Terminal=false
 Categories=Utility;TextEditor;

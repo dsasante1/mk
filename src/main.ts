@@ -6,8 +6,8 @@
 // ticked checkbox).
 
 import "./styles.css";
-import { Text } from "@codemirror/state";
-import type { ViewUpdate } from "@codemirror/view";
+import { Text, type EditorState } from "@codemirror/state";
+import type { EditorView, ViewUpdate } from "@codemirror/view";
 import { nextDiagnostic, previousDiagnostic } from "@codemirror/lint";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -42,16 +42,35 @@ let settings: Settings;
 let savingSettings: Promise<void> = Promise.resolve();
 let home: string | null = null;
 
-const doc = {
-  path: null as string | null,
-  eol: "\n" as Eol,
-  saved: Text.empty,
-  mtime: null as number | null,
+/**
+ * One open document. The editor, preview and Harper are shared and show the
+ * current tab, `doc`; every other tab keeps its whole editor state (undo
+ * history, selection) and its place, ready to be put back.
+ */
+interface Tab {
+  path: string | null;
+  eol: Eol;
+  saved: Text;
+  mtime: number | null;
   /** Set while our own save is in flight, so the watcher does not see it as someone else's. */
-  writing: false,
-};
+  writing: boolean;
+  /** The editor state while another tab has the editor; null while this one does. */
+  state: EditorState | null;
+  scroll: ReturnType<EditorView["scrollSnapshot"]> | null;
+  previewTop: number;
+}
 
-const dirty = () => !editor.doc.eq(doc.saved);
+const newTab = (): Tab =>
+  ({ path: null, eol: "\n", saved: Text.empty, mtime: null, writing: false, state: null, scroll: null, previewTop: 0 });
+
+let doc = newTab();
+const tabs: Tab[] = [doc];
+
+const textOf = (t: Tab) => (t === doc ? editor.doc : t.state?.doc ?? Text.empty);
+const isDirty = (t: Tab) => !textOf(t).eq(t.saved);
+const dirty = () => isDirty(doc);
+/** An untitled, empty, untouched tab: what opening a file may take over. */
+const pristine = (t: Tab) => !t.path && textOf(t).length === 0 && !isDirty(t);
 
 // ---------------------------------------------------------------- toasts
 
@@ -450,6 +469,7 @@ function updateTitle() {
   $("doc-dirty").hidden = !d;
   $("doc-dir").textContent = doc.path ? tildify(dirName(doc.path), home) : "";
   void win.setTitle(`${d ? "● " : ""}${name} — mk`);
+  renderTabs();
 }
 
 function updateStatus() {
@@ -484,36 +504,135 @@ async function confirmDiscard(action: string): Promise<boolean> {
   return r === "Don't Save" || r === "No";
 }
 
-function loadDoc(path: string | null, content: string, mtime: number | null) {
-  doc.path = path;
-  doc.eol = detectEol(content);
-  const text = content.replace(/\r\n?/g, "\n");
-  doc.mtime = mtime;
-  editor.load(text);
-  doc.saved = editor.doc;
-  preview.setDir(path ? dirName(path) : null);
+// ---------------------------------------------------------------- tabs
+
+const tabName = (t: Tab) => (t.path ? baseName(t.path) : "Untitled");
+
+function renderTabs() {
+  const bar = $("tabs");
+  bar.replaceChildren(...tabs.map((t) => {
+    const el = document.createElement("div");
+    el.className = `tab${t === doc ? " on" : ""}${isDirty(t) ? " dirty" : ""}`;
+    el.setAttribute("role", "tab");
+    el.setAttribute("aria-selected", String(t === doc));
+    el.title = t.path ? tildify(t.path, home) : "Untitled";
+    const name = Object.assign(document.createElement("span"), { className: "tab-name", textContent: tabName(t) });
+    const x = document.createElement("button");
+    x.className = "tab-x";
+    x.innerHTML = icons.close;
+    x.setAttribute("aria-label", `Close ${tabName(t)}`);
+    x.onclick = (e) => { e.stopPropagation(); void closeTab(t); };
+    el.append(name, x);
+    el.onclick = () => activate(t);
+    // Middle-click closes, as in a browser.
+    el.onauxclick = (e) => { if (e.button === 1) { e.preventDefault(); void closeTab(t); } };
+    return el;
+  }));
+  const on = bar.querySelector<HTMLElement>(".tab.on");
+  if (on) {
+    if (on.offsetLeft < bar.scrollLeft) bar.scrollLeft = on.offsetLeft;
+    else if (on.offsetLeft + on.offsetWidth > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = on.offsetLeft + on.offsetWidth - bar.clientWidth;
+  }
+}
+
+/** Put the current tab's editor state and place aside. */
+function stash() {
+  doc.state = editor.view.state;
+  doc.scroll = editor.view.scrollSnapshot();
+  doc.previewTop = preview.pane.scrollTop;
+}
+
+/** Show `doc` in the shared editor, preview and Harper. */
+function showDoc() {
+  preview.setDir(doc.path ? dirName(doc.path) : null);
   hideBanner();
   updateTitle();
   updateStatus();
-  void grammar.reset(path);
-  preview.pane.scrollTop = 0;
+  void grammar.reset(doc.path);
   window.clearTimeout(previewTimer);
   if (settings.view !== "edit") preview.render(editor.text());
   sectionNav.set(headings(editor.text()));
   editor.view.focus();
 }
 
+/** Make `t` current, without stashing whatever was: it may be gone. */
+function enter(t: Tab) {
+  doc = t;
+  if (t.state) editor.restore(t.state);
+  else editor.load("");
+  const scroll = t.scroll;
+  t.state = null;
+  t.scroll = null;
+  showDoc();
+  if (scroll) editor.view.dispatch({ effects: scroll });
+  expected.preview = t.previewTop;
+  preview.pane.scrollTop = t.previewTop;
+  void checkDisk();
+}
+
+function activate(t: Tab) {
+  if (t === doc || !tabs.includes(t)) return;
+  stash();
+  enter(t);
+}
+
+function cycleTab(step: number) {
+  const i = tabs.indexOf(doc);
+  activate(tabs[(i + step + tabs.length) % tabs.length]);
+}
+
+/** A new tab after the current one, holding `text`, made current. */
+function addTab(text: string): Tab {
+  stash();
+  const t = newTab();
+  tabs.splice(tabs.indexOf(doc) + 1, 0, t);
+  doc = t;
+  editor.load(text);
+  return t;
+}
+
+async function closeTab(t: Tab) {
+  if (!tabs.includes(t)) return;
+  if (isDirty(t)) {
+    activate(t);
+    if (!(await confirmDiscard("Close"))) return;
+  }
+  const i = tabs.indexOf(t);
+  if (i < 0) return;
+  tabs.splice(i, 1);
+  if (t !== doc) { renderTabs(); return; }
+  // The last tab closed leaves an empty one, not an empty window.
+  if (tabs.length === 0) tabs.push(newTab());
+  enter(tabs[Math.min(i, tabs.length - 1)]);
+}
+
+/** Open text as a document: in the current tab if that is still blank, else in a new one. */
+function openDoc(path: string | null, content: string, mtime: number | null) {
+  const text = content.replace(/\r\n?/g, "\n");
+  if (pristine(doc)) editor.load(text);
+  else addTab(text);
+  doc.path = path;
+  doc.eol = detectEol(content);
+  doc.mtime = mtime;
+  doc.saved = editor.doc;
+  preview.pane.scrollTop = 0;
+  showDoc();
+}
+
 async function openPath(path: string) {
-  if (path === doc.path) return;
-  if (!(await confirmDiscard("Open"))) return;
+  const open = tabs.find((t) => t.path === path);
+  if (open) { activate(open); return; }
   try {
     const d = await api.readFile(path);
-    loadDoc(d.path, d.content, d.mtime);
+    // The same file by another name, a symlink say, is still the one tab.
+    const same = tabs.find((t) => t.path === d.path);
+    if (same) { activate(same); return; }
+    openDoc(d.path, d.content, d.mtime);
   } catch (e) {
     const msg = String(e);
     // A path that does not exist yet is a new document to be saved there.
     if (/No such file|not found|os error 2/i.test(msg)) {
-      loadDoc(path, "", null);
+      openDoc(path, "", null);
       toast(`New file — it will be created at ${tildify(path, home)} on save`);
     } else {
       await message(msg, { title: "Could not open", kind: "error" });
@@ -521,14 +640,20 @@ async function openPath(path: string) {
   }
 }
 
-async function openWithDialog() {
-  const picked = await openDialog({ multiple: false, directory: false, filters: MD_FILTERS, defaultPath: doc.path ? dirName(doc.path) : undefined });
-  if (typeof picked === "string") await openPath(picked);
+async function openPaths(paths: string[]) {
+  for (const p of paths) await openPath(p);
 }
 
-async function newDoc() {
-  if (!(await confirmDiscard("New document"))) return;
-  loadDoc(null, "", null);
+async function openWithDialog() {
+  const picked = await openDialog({ multiple: true, directory: false, filters: MD_FILTERS, defaultPath: doc.path ? dirName(doc.path) : undefined });
+  if (picked) await openPaths(Array.isArray(picked) ? picked : [picked]);
+}
+
+function newDoc() {
+  if (pristine(doc)) { editor.view.focus(); return; }
+  addTab("");
+  preview.pane.scrollTop = 0;
+  showDoc();
 }
 
 async function save(): Promise<boolean> {
@@ -543,8 +668,9 @@ async function saveAs(): Promise<boolean> {
   });
   if (!picked) return false;
   const path = /\.[^/\\]+$/.test(baseName(picked)) ? picked : `${picked}.md`;
+  const was = doc.path;
   const ok = await writeTo(path);
-  if (ok && path !== doc.path) {
+  if (ok && path !== was) {
     doc.path = path;
     preview.setDir(dirName(path));
     void grammar.reset(path);
@@ -555,12 +681,14 @@ async function saveAs(): Promise<boolean> {
 }
 
 async function writeTo(path: string): Promise<boolean> {
+  // The tab, not `doc`: the user may switch tabs while the write is out.
+  const t = doc;
   const snapshot = editor.doc;
-  doc.writing = true;
+  t.writing = true;
   try {
-    doc.mtime = await api.writeFile(path, withEol(snapshot.toString(), doc.eol));
-    doc.path = path;
-    doc.saved = snapshot;
+    t.mtime = await api.writeFile(path, withEol(snapshot.toString(), t.eol));
+    t.path = path;
+    t.saved = snapshot;
     updateTitle();
     toast(`Saved ${baseName(path)}`, 1400);
     return true;
@@ -568,7 +696,7 @@ async function writeTo(path: string): Promise<boolean> {
     await message(String(e), { title: "Could not save", kind: "error" });
     return false;
   } finally {
-    doc.writing = false;
+    t.writing = false;
   }
 }
 
@@ -589,9 +717,11 @@ function showBanner(text: string, actions: [string, () => void][]) {
 function hideBanner() { $("banner").hidden = true; }
 
 async function reloadFromDisk(quiet: boolean) {
-  if (!doc.path) return;
+  const t = doc;
+  if (!t.path) return;
   try {
-    const d = await api.readFile(doc.path);
+    const d = await api.readFile(t.path);
+    if (t !== doc) return;
     doc.eol = detectEol(d.content);
     editor.replaceKeepingPlace(d.content.replace(/\r\n?/g, "\n"));
     doc.saved = editor.doc;
@@ -610,14 +740,15 @@ async function reloadFromDisk(quiet: boolean) {
  * one asks, because either answer loses somebody's work.
  */
 async function checkDisk() {
-  if (!doc.path || doc.writing || doc.mtime === null || !$("banner").hidden) return;
-  const m = await api.fileMtime(doc.path).catch(() => null);
-  if (m === null || m === doc.mtime || doc.writing) return;
+  const t = doc;
+  if (!t.path || t.writing || t.mtime === null || !$("banner").hidden) return;
+  const m = await api.fileMtime(t.path).catch(() => null);
+  if (t !== doc || m === null || m === t.mtime || t.writing) return;
   if (!dirty()) { await reloadFromDisk(true); return; }
   const seen = m;
-  showBanner(`${baseName(doc.path)} changed on disk.`, [
+  showBanner(`${baseName(t.path)} changed on disk.`, [
     ["Reload (lose my edits)", () => void reloadFromDisk(false)],
-    ["Keep mine", () => { doc.mtime = seen; }],
+    ["Keep mine", () => { t.mtime = seen; }],
   ]);
 }
 
@@ -639,7 +770,11 @@ function onKey(e: KeyboardEvent) {
   if (mod && !e.shiftKey && k === "s") { stop(); void save(); return; }
   if (mod && e.shiftKey && k === "s") { stop(); void saveAs(); return; }
   if (mod && !e.shiftKey && k === "o") { stop(); void openWithDialog(); return; }
-  if (mod && !e.shiftKey && k === "n") { stop(); void newDoc(); return; }
+  if (mod && !e.shiftKey && k === "n") { stop(); newDoc(); return; }
+  if (mod && !e.shiftKey && k === "w") { stop(); void closeTab(doc); return; }
+  if (mod && e.key === "Tab") { stop(); cycleTab(e.shiftKey ? -1 : 1); return; }
+  if (mod && e.key === "PageDown") { stop(); cycleTab(1); return; }
+  if (mod && e.key === "PageUp") { stop(); cycleTab(-1); return; }
   if (mod && !e.shiftKey && k === "q") { stop(); void win.close(); return; }
   if (mod && !e.shiftKey && e.key === ",") { stop(); void settingsDialog.show(); return; }
   if (mod && !e.shiftKey && (e.key === "1" || e.key === "2" || e.key === "3")) {
@@ -723,7 +858,7 @@ async function boot() {
   $("btn-save").innerHTML = icons.save;
   $("btn-settings").innerHTML = icons.settings;
   $("btn-problems-close").innerHTML = icons.close;
-  $("btn-new").onclick = () => void newDoc();
+  $("btn-new").onclick = newDoc;
   $("btn-open").onclick = () => void openWithDialog();
   $("btn-save").onclick = () => void save();
   $("btn-settings").onclick = () => void settingsDialog.show();
@@ -749,21 +884,26 @@ async function boot() {
   harperState = settings.grammar ? "checking" : "off";
   updateHarperStatus();
 
-  // Files dropped on the window open, the first of them.
+  // Files dropped on the window open, each in its own tab.
   await getCurrentWebview().onDragDropEvent((e) => {
-    if (e.payload.type === "drop" && e.payload.paths.length) void openPath(e.payload.paths[0]);
+    if (e.payload.type === "drop") void openPaths(e.payload.paths);
   });
 
+  // Every tab with unsaved work is asked about, in turn; one Cancel keeps the window.
   await win.onCloseRequested(async (e) => {
-    if (!(await confirmDiscard("Close"))) e.preventDefault();
+    for (const t of [...tabs]) {
+      if (!isDirty(t)) continue;
+      activate(t);
+      if (!(await confirmDiscard("Close"))) { e.preventDefault(); return; }
+    }
   });
 
   window.setInterval(() => void checkDisk(), 2000);
 
   const launch = await api.launch();
   if (launch.view) setView(launch.view, false);
-  if (launch.path) await openPath(launch.path);
-  else loadDoc(null, "", null);
+  if (launch.paths.length) await openPaths(launch.paths);
+  else showDoc();
 }
 
 boot().catch((e) => {

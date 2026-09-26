@@ -47,27 +47,31 @@ impl AppState {
 
 #[derive(Serialize)]
 struct Launch {
-    path: Option<String>,
+    /// Every file named, in order; each opens in its own tab.
+    paths: Vec<String>,
     view: Option<String>,
 }
 
-/// What the command line asked for: `mk notes.md`, `mk --view README.md`.
+/// What the command line asked for: `mk notes.md`, `mk --view README.md`,
+/// `mk a.md b.md`. A file named twice opens once.
 /// A path that does not exist is still a path — it is the file the first save
 /// creates, which is what `vim new.md` has taught everyone to expect.
 fn parse_args(args: impl IntoIterator<Item = String>, cwd: &Path) -> Launch {
-    let mut out = Launch { path: None, view: None };
+    let mut out = Launch { paths: Vec::new(), view: None };
     for a in args {
         match a.as_str() {
             "-v" | "--view" => out.view = Some("preview".into()),
             "-e" | "--edit" => out.view = Some("edit".into()),
             "-s" | "--split" => out.view = Some("split".into()),
             s if s.starts_with('-') => {}
-            s if out.path.is_none() => {
+            s => {
                 let p = PathBuf::from(s);
                 let p = if p.is_absolute() { p } else { cwd.join(p) };
-                out.path = Some(std::fs::canonicalize(&p).unwrap_or(p).to_string_lossy().to_string());
+                let p = std::fs::canonicalize(&p).unwrap_or(p).to_string_lossy().to_string();
+                if !out.paths.contains(&p) {
+                    out.paths.push(p);
+                }
             }
-            _ => {}
         }
     }
     out
@@ -281,10 +285,10 @@ mod tests {
     fn launch_flags() {
         let l = args(&["--view", "notes.md"]);
         assert_eq!(l.view.as_deref(), Some("preview"));
-        assert_eq!(l.path.as_deref(), Some("/tmp/nowhere-mk/notes.md"));
-        let l = args(&["/abs/a.md", "b.md", "--bogus"]);
-        assert_eq!(l.path.as_deref(), Some("/abs/a.md"));
+        assert_eq!(l.paths, vec!["/tmp/nowhere-mk/notes.md"]);
+        let l = args(&["/abs/a.md", "b.md", "--bogus", "/abs/a.md"]);
+        assert_eq!(l.paths, vec!["/abs/a.md", "/tmp/nowhere-mk/b.md"]);
         assert!(l.view.is_none());
-        assert!(args(&[]).path.is_none());
+        assert!(args(&[]).paths.is_empty());
     }
 }
