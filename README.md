@@ -17,6 +17,8 @@ mk -v README.md                 # open in preview-only mode
 
 **Viewing.** A live preview with GitHub-flavoured rendering: tables, task lists, strikethrough, autolinks, heading anchors, highlighted code, raw HTML (sanitised) and front matter. Images next to the document load from disk. The preview scrolls in step with the editor. You can tick a task in the preview and the editor changes with it. A link to another Markdown file opens that file in mk.
 
+**Finding your place.** A short dash for each heading sits at the right edge of the page. The dash for the section you are reading is longer and coloured, and it moves as you scroll. Click a dash to go to its section, or hover over the dashes to see the headings by name. It works in the editor-only view too, and you can turn it off in Settings.
+
 **Harper.** Underlines come in three colours:
 
 | | Group | Harper kinds |
@@ -89,4 +91,5 @@ cargo test --manifest-path src-tauri/Cargo.toml    # Harper bridge, settings, CL
 | `src/grammar.ts` | When to lint and how to show the results. Edits made while a lint is running are mapped onto its results, so underlines never land on the wrong words. |
 | `src/editor.ts` | CodeMirror setup and the formatting commands. |
 | `src/markdown.ts`, `src/preview.ts` | Rendering with source-line anchors, sanitising, images, links and scroll sync. |
+| `src/section-nav.ts` | The section rail: which heading you are under, and jumping between them. |
 | `src/main.ts` | The app shell. |

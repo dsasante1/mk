@@ -29,6 +29,8 @@ pub struct Settings {
     pub line_numbers: bool,
     pub wrap: bool,
     pub sync_scroll: bool,
+    /// The rail of section dashes at the page's edge.
+    pub section_nav: bool,
     /// Editor share of the split, 0–1.
     pub split: f64,
     pub problems_open: bool,
@@ -51,6 +53,7 @@ impl Default for Settings {
             line_numbers: false,
             wrap: true,
             sync_scroll: true,
+            section_nav: true,
             split: 0.5,
             problems_open: false,
             grammar: true,

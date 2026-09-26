@@ -151,6 +151,44 @@ button:disabled { opacity: 0.45; cursor: default; }
 /* Editor-only reads like a page, not a terminal. */
 #workspace[data-view="edit"] .cm-content { max-width: 860px; margin: 0 auto; }
 
+/* ---------------------------------------------------------------- section rail */
+
+#workspace { position: relative; }
+#section-nav {
+  position: absolute; z-index: 5; top: 50%; right: calc(var(--problems-w) + 16px); transform: translateY(-50%);
+  display: flex; align-items: center;
+}
+/* The left padding widens the hover target and bridges the gap to the menu. */
+.sn-rail { position: relative; display: flex; flex-direction: column; max-height: 70vh; overflow-y: auto; padding: 4px 0 4px 14px; scrollbar-width: none; }
+.sn-rail::-webkit-scrollbar { display: none; }
+.sn-dash { flex: none; display: flex; align-items: center; justify-content: flex-end; width: 22px; height: 10px; cursor: pointer; }
+.sn-dash::before { content: ""; height: 2px; width: 14px; border-radius: 2px; background: var(--border-strong); transition: width 0.15s, background 0.15s; }
+.sn-dash[data-depth="1"]::before { width: 10px; }
+.sn-dash[data-depth="2"]::before { width: 6px; }
+.sn-dash:hover::before { background: var(--muted); }
+.sn-dash.on::before { width: 22px; background: var(--accent); }
+
+.sn-menu {
+  position: absolute; right: 100%; top: 50%; transform: translate(6px, -50%);
+  width: 250px; max-height: 70vh; overflow-y: auto; padding: 5px;
+  background: var(--bg-raised); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
+  opacity: 0; pointer-events: none; transition: opacity 0.12s, transform 0.12s;
+}
+#section-nav:hover .sn-menu, #section-nav:has(:focus-visible) .sn-menu {
+  opacity: 1; pointer-events: auto; transform: translate(0, -50%); transition-delay: 0.12s;
+}
+.sn-item {
+  display: block; width: 100%; text-align: left; padding: 4px 9px; font-size: 12.5px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sn-item[data-depth="1"] { padding-left: 21px; }
+.sn-item[data-depth="2"] { padding-left: 33px; font-size: 12px; }
+.sn-item:hover { color: var(--fg); }
+.sn-item.on { color: var(--accent); font-weight: 600; }
+
+/* Keep wrapped editor text clear of the rail when the editor is the page. */
+#workspace.has-sections[data-view="edit"] .cm-line { padding-right: 56px; }
+
 /* ---------------------------------------------------------------- Harper in the editor */
 
 .cm-lintRange.hp-mark { background-image: none !important; text-decoration: underline wavy; text-decoration-skip-ink: none; text-underline-offset: 4px; text-decoration-thickness: 1.5px; }

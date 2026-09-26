@@ -69,6 +69,7 @@ export class SettingsDialog {
     body.append(this.toggle("Wrap long lines", s.wrap, (v) => this.set({ wrap: v })));
     body.append(this.toggle("Line numbers", s.lineNumbers, (v) => this.set({ lineNumbers: v })));
     body.append(this.toggle("Sync preview scrolling with the editor", s.syncScroll, (v) => this.set({ syncScroll: v })));
+    body.append(this.toggle("Section markers at the edge of the page", s.sectionNav, (v) => this.set({ sectionNav: v })));
 
     // ---- grammar ----
     body.append(h("h3", {}, "Harper"));
