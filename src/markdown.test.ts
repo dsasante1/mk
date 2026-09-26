@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render } from "./markdown";
+import { headings, render } from "./markdown";
 
 describe("render", () => {
   it("stamps blocks with their source line", () => {
@@ -41,5 +41,21 @@ describe("render", () => {
 
   it("escapes code in unknown languages", () => {
     expect(render("```nosuchlang\n<b>x</b>\n```\n")).toContain("&lt;b&gt;x&lt;/b&gt;");
+  });
+});
+
+describe("headings", () => {
+  it("finds ATX and setext headings with their line and plain text", () => {
+    expect(headings("# One\n\ntext\n\nTwo **bold** `code`\n---\n\n### Three\n")).toEqual([
+      { line: 0, level: 1, text: "One" },
+      { line: 4, level: 2, text: "Two bold code" },
+      { line: 7, level: 3, text: "Three" },
+    ]);
+  });
+
+  it("skips a # inside code and counts lines after front matter", () => {
+    expect(headings("---\ntitle: x\n---\n```sh\n# not a heading\n```\n## Real\n")).toEqual([
+      { line: 6, level: 2, text: "Real" },
+    ]);
   });
 });
