@@ -40,7 +40,11 @@ for pair in 32x32:32x32.png 64x64:64x64.png 128x128:128x128.png \
   install -Dm644 "src-tauri/icons/${pair#*:}" "$ICONDIR/$size/apps/mk.png"
 done
 
-install -Dm644 mk.desktop "$APPDIR/mk.desktop"
+# The launcher's absolute path, not `mk`: a desktop session's PATH is set at
+# login and often lacks ~/.local/bin, and an Exec that does not resolve is a
+# menu entry that silently does nothing.
+sed "s|^Exec=.*|Exec=env MK_FOREGROUND=1 $BINDIR/mk %f|" mk.desktop > "$APPDIR/mk.desktop"
+chmod 644 "$APPDIR/mk.desktop"
 
 command -v update-desktop-database >/dev/null && update-desktop-database "$APPDIR" || true
 command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -qtf "$ICONDIR" 2>/dev/null || true

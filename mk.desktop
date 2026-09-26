@@ -6,7 +6,7 @@ Comment=Markdown viewer and editor with Harper grammar checking
 Exec=env MK_FOREGROUND=1 mk %f
 Icon=mk
 Terminal=false
-Categories=Office;TextEditor;Utility;
+Categories=Utility;TextEditor;
 MimeType=text/markdown;text/x-markdown;
 Keywords=markdown;md;grammar;spelling;harper;writing;
 StartupWMClass=mk
