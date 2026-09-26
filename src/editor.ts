@@ -234,13 +234,25 @@ export class Editor {
 
   // ---- scroll position as a fractional, 0-based source line ----
 
-  topLine(): number {
+  /** The line at the top of the view, or `offset` px below it. */
+  topLine(offset = 0): number {
     const v = this.view;
-    const top = v.scrollDOM.scrollTop - v.documentPadding.top;
+    const top = v.scrollDOM.scrollTop + offset - v.documentPadding.top;
     const block = v.lineBlockAtHeight(Math.max(0, top));
     const line = v.state.doc.lineAt(block.from).number - 1;
     const frac = block.height > 0 ? Math.min(1, Math.max(0, (top - block.top) / block.height)) : 0;
     return line + frac;
+  }
+
+  /**
+   * Put 0-based source line `line` `margin` px below the top. CodeMirror does
+   * the scrolling, because lines it has not drawn yet only have estimated
+   * heights, and it corrects the estimate as it goes.
+   */
+  scrollToLine(line: number, margin = 0) {
+    const doc = this.view.state.doc;
+    const at = doc.line(Math.min(doc.lines, Math.max(1, line + 1))).from;
+    this.view.dispatch({ effects: EditorView.scrollIntoView(at, { y: "start", yMargin: margin }) });
   }
 
   /** Where `topLine` would read `line`; the caller does the scrolling. */

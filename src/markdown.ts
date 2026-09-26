@@ -51,6 +51,11 @@ function sourceLines(md: MarkdownIt) {
   };
 }
 
+/** A heading's words, without the Markdown around them. */
+function headingText(inline: Token | undefined): string {
+  return inline?.children?.filter((c) => c.type === "text" || c.type === "code_inline").map((c) => c.content).join("") ?? "";
+}
+
 /** GitHub-style ids on headings, de-duplicated with -1, -2, … */
 function headingIds(md: MarkdownIt) {
   md.core.ruler.push("heading_ids", (state) => {
@@ -58,8 +63,7 @@ function headingIds(md: MarkdownIt) {
     const toks = state.tokens;
     for (let i = 0; i < toks.length; i++) {
       if (toks[i].type !== "heading_open") continue;
-      const inline = toks[i + 1];
-      const text = inline?.children?.filter((c) => c.type === "text" || c.type === "code_inline").map((c) => c.content).join("") ?? "";
+      const text = headingText(toks[i + 1]);
       const base = slugify(text) || "section";
       const n = seen.get(base) ?? 0;
       seen.set(base, n + 1);
@@ -137,4 +141,29 @@ export function render(src: string): string {
   const html = shared.renderer.render(tokens, shared.options, env);
   if (meta === null) return html;
   return `<pre class="front-matter" data-line="0"><code>${escapeHtml(meta)}</code></pre>\n${html}`;
+}
+
+export interface Heading {
+  /** 0-based source line, as the editor has it. */
+  line: number;
+  level: number;
+  text: string;
+}
+
+/**
+ * The document's headings, found by the same parser the preview uses, so a
+ * `#` inside a code fence is not one and a setext heading is. Works without
+ * the preview, which the editor-only view never renders.
+ */
+export function headings(src: string): Heading[] {
+  shared ??= createRenderer();
+  const { body, offset } = frontMatter(src);
+  const toks = shared.parse(body, {});
+  const out: Heading[] = [];
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    if (t.type !== "heading_open" || !t.map) continue;
+    out.push({ line: t.map[0] + offset, level: Number(t.tag.slice(1)), text: headingText(toks[i + 1]).trim() });
+  }
+  return out;
 }
