@@ -52,6 +52,16 @@ describe("paths", () => {
     expect(tildify("/home/me/notes/a.md", "/home/me")).toBe("~/notes/a.md");
     expect(tildify("/home/meow/a.md", "/home/me")).toBe("/home/meow/a.md");
   });
+  it("resolves Windows paths", () => {
+    expect(dirName("C:\\Users\\me\\a.md")).toBe("C:\\Users\\me");
+    expect(resolvePath("C:\\Users\\me\\docs", "img/a.png")).toBe("C:\\Users\\me\\docs\\img\\a.png");
+    expect(resolvePath("C:\\Users\\me\\docs", "..\\README.md#top")).toBe("C:\\Users\\me\\README.md");
+    expect(resolvePath("C:\\docs", "./my%20notes.md")).toBe("C:\\docs\\my notes.md");
+    expect(resolvePath("C:\\docs", "/x.md")).toBe("C:\\x.md");
+    expect(resolvePath("C:\\docs", "D:/other/x.md")).toBe("D:\\other\\x.md");
+    expect(resolvePath("\\\\server\\share\\docs", "a.md")).toBe("\\\\server\\share\\docs\\a.md");
+    expect(tildify("C:\\Users\\me\\notes\\a.md", "C:\\Users\\me")).toBe("~\\notes\\a.md");
+  });
   it("classifies links", () => {
     expect(isExternal("https://x.org")).toBe(true);
     expect(isExternal("mailto:a@b.c")).toBe(true);

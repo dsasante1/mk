@@ -56,6 +56,23 @@ struct Launch {
 /// `mk a.md b.md`. A file named twice opens once.
 /// A path that does not exist is still a path — it is the file the first save
 /// creates, which is what `vim new.md` has taught everyone to expect.
+/// `canonicalize`, minus the `\\?\` prefix Windows puts on the result. The
+/// frontend shows these paths and resolves links against them, and a
+/// verbatim path is neither what the user typed nor one `/` can extend.
+fn canonical(p: &Path) -> std::io::Result<PathBuf> {
+    let c = std::fs::canonicalize(p)?;
+    if cfg!(windows) {
+        let s = c.to_string_lossy();
+        if let Some(unc) = s.strip_prefix(r"\\?\UNC\") {
+            return Ok(PathBuf::from(format!(r"\\{unc}")));
+        }
+        if let Some(rest) = s.strip_prefix(r"\\?\") {
+            return Ok(PathBuf::from(rest));
+        }
+    }
+    Ok(c)
+}
+
 fn parse_args(args: impl IntoIterator<Item = String>, cwd: &Path) -> Launch {
     let mut out = Launch { paths: Vec::new(), view: None };
     for a in args {
@@ -67,7 +84,7 @@ fn parse_args(args: impl IntoIterator<Item = String>, cwd: &Path) -> Launch {
             s => {
                 let p = PathBuf::from(s);
                 let p = if p.is_absolute() { p } else { cwd.join(p) };
-                let p = std::fs::canonicalize(&p).unwrap_or(p).to_string_lossy().to_string();
+                let p = canonical(&p).unwrap_or(p).to_string_lossy().to_string();
                 if !out.paths.contains(&p) {
                     out.paths.push(p);
                 }
@@ -104,7 +121,7 @@ fn allow_assets(app: &tauri::AppHandle, doc: &Path) {
 
 #[tauri::command]
 fn read_file(app: tauri::AppHandle, path: String) -> Result<Doc, String> {
-    let p = std::fs::canonicalize(&path).map_err(|e| format!("{path}: {e}"))?;
+    let p = canonical(Path::new(&path)).map_err(|e| format!("{path}: {e}"))?;
     let meta = std::fs::metadata(&p).map_err(|e| format!("{path}: {e}"))?;
     if meta.is_dir() {
         return Err(format!("{path} is a folder"));
@@ -135,7 +152,7 @@ fn write_file(app: tauri::AppHandle, path: String, content: String) -> Result<Op
     let p = PathBuf::from(&path);
     settings::write_atomic(&p, content.as_bytes())?;
     allow_assets(&app, &p);
-    Ok(mtime_of(&std::fs::canonicalize(&p).unwrap_or(p)))
+    Ok(mtime_of(&canonical(&p).unwrap_or(p)))
 }
 
 #[tauri::command]
@@ -277,18 +294,33 @@ fn main() {
 mod tests {
     use super::*;
 
+    // Paths that do not exist, so they come back as built rather than resolved.
+    const CWD: &str = if cfg!(windows) { r"C:\nowhere-mk" } else { "/tmp/nowhere-mk" };
+    const ABS: &str = if cfg!(windows) { r"C:\abs\a.md" } else { "/abs/a.md" };
+
     fn args(v: &[&str]) -> Launch {
-        parse_args(v.iter().map(|s| s.to_string()), Path::new("/tmp/nowhere-mk"))
+        parse_args(v.iter().map(|s| s.to_string()), Path::new(CWD))
+    }
+
+    fn in_cwd(name: &str) -> String {
+        Path::new(CWD).join(name).to_string_lossy().to_string()
     }
 
     #[test]
     fn launch_flags() {
         let l = args(&["--view", "notes.md"]);
         assert_eq!(l.view.as_deref(), Some("preview"));
-        assert_eq!(l.paths, vec!["/tmp/nowhere-mk/notes.md"]);
-        let l = args(&["/abs/a.md", "b.md", "--bogus", "/abs/a.md"]);
-        assert_eq!(l.paths, vec!["/abs/a.md", "/tmp/nowhere-mk/b.md"]);
+        assert_eq!(l.paths, vec![in_cwd("notes.md")]);
+        let l = args(&[ABS, "b.md", "--bogus", ABS]);
+        assert_eq!(l.paths, vec![ABS.to_string(), in_cwd("b.md")]);
         assert!(l.view.is_none());
         assert!(args(&[]).paths.is_empty());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn canonical_paths_are_plain() {
+        let p = canonical(&std::env::temp_dir()).unwrap();
+        assert!(!p.to_string_lossy().starts_with(r"\\?\"), "{}", p.display());
     }
 }

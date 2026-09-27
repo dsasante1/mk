@@ -73,7 +73,9 @@ export function dirName(path: string): string {
 
 /** `~/…` for anything under the home directory, for the title bar. */
 export function tildify(path: string, home: string | null): string {
-  if (home && (path === home || path.startsWith(home + "/"))) return "~" + path.slice(home.length);
+  if (!home) return path;
+  const sep = home.includes("\\") ? "\\" : "/";
+  if (path === home || path.startsWith(home + sep)) return "~" + path.slice(home.length);
   return path;
 }
 
@@ -87,19 +89,33 @@ export function isExternal(href: string): boolean {
  * decoded, since `my%20notes.md` names a file with a space in it, and
  * `?query` / `#fragment` are the caller's business, not part of the path.
  * `dir` is absolute: a document always has an absolute path by the time it
- * has links worth following.
+ * has links worth following. On Windows that is `C:\…` or `\\server\…`,
+ * and the result keeps the drive and uses backslashes; a link written with
+ * `/` resolves the same either way.
  */
 export function resolvePath(dir: string, rel: string): string {
   let target = rel.replace(/[?#].*$/, "");
   try { target = decodeURIComponent(target); } catch { /* keep it raw */ }
-  const full = target.startsWith("/") ? target : `${dir}/${target}`;
+  const win = /^[a-z]:[\\/]/i.exec(dir)?.[0].slice(0, 2) ?? (dir.startsWith("\\\\") ? "\\" : null);
+  if (win === null) {
+    const full = target.startsWith("/") ? target : `${dir}/${target}`;
+    return "/" + normalise(full.split("/")).join("/");
+  }
+  // A drive-absolute target replaces `dir`; a rooted one (`/x`) keeps its drive.
+  const drive = /^[a-z]:[\\/]/i.exec(target)?.[0].slice(0, 2);
+  const root = drive ?? win;
+  const rest = drive ? target.slice(2) : /^[\\/]/.test(target) ? target : `${dir.slice(win.length)}\\${target}`;
+  return `${root}\\${normalise(rest.split(/[\\/]/)).join("\\")}`;
+}
+
+function normalise(segs: string[]): string[] {
   const parts: string[] = [];
-  for (const seg of full.split("/")) {
+  for (const seg of segs) {
     if (seg === "" || seg === ".") continue;
     if (seg === "..") parts.pop();
     else parts.push(seg);
   }
-  return "/" + parts.join("/");
+  return parts;
 }
 
 export function isMarkdownPath(path: string): boolean {

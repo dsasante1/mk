@@ -1,0 +1,60 @@
+# Installers for Linux, macOS and Windows, built when a version tag is
+# pushed (`git tag v0.2.0 && git push origin v0.2.0`) and attached to a draft
+# GitHub Release, to be checked and published by hand.
+#
+# Nothing is code-signed yet: macOS will say the app is from an unidentified
+# developer and Windows SmartScreen will warn, until signing secrets are added.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            args: ""
+          # One app for both Apple silicon and Intel Macs.
+          - os: macos-latest
+            args: --target universal-apple-darwin
+          - os: windows-latest
+            args: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: mk ${{ github.ref_name }}
+          releaseBody: Downloads for Linux (.deb, .rpm, AppImage), macOS (.dmg) and Windows (.msi, setup .exe). See the README for install notes.
+          releaseDraft: true
+          args: ${{ matrix.args }}

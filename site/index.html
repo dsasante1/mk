@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>mk — Markdown editor with Harper</title>
-  <meta name="description" content="A standalone Markdown viewer and editor for Linux with the Harper grammar checker built in. Spelling, grammar and style, checked on your machine as you type.">
+  <meta name="description" content="A standalone Markdown viewer and editor for Linux, macOS and Windows with the Harper grammar checker built in. Spelling, grammar and style, checked on your machine as you type.">
   <meta name="color-scheme" content="light dark">
   <meta property="og:title" content="mk — Markdown editor with Harper">
   <meta property="og:description" content="Spelling, grammar and style, checked on your machine as you type.">
@@ -28,12 +28,12 @@
       <div class="hero-text">
         <img class="hero-icon" src="/icon.png" alt="The mk icon: a Markdown mark over a green squiggle" width="112" height="112">
         <h1>Write Markdown.<br>Harper checks it as you type.</h1>
-        <p class="lede">mk is a standalone Markdown viewer and editor for Linux with the <a href="https://github.com/automattic/harper">Harper</a> grammar checker built in. Spelling, grammar and style are checked on your machine. There's no server, no account, and nothing else to install.</p>
+        <p class="lede">mk is a standalone Markdown viewer and editor for Linux, macOS and Windows with the <a href="https://github.com/automattic/harper">Harper</a> grammar checker built in. Spelling, grammar and style are checked on your machine. There's no server, no account, and nothing else to install.</p>
         <div class="cta">
-          <a class="button primary" href="#install">Build and install</a>
+          <a class="button primary" href="#install">Download and install</a>
           <a class="button" href="https://github.com/dsasante1/mk">View source</a>
         </div>
-        <p class="meta">Free and open source · MIT licence · Linux (.deb, AppImage)</p>
+        <p class="meta">Free and open source · MIT licence · Linux, macOS and Windows</p>
       </div>
 
       <figure class="window" aria-label="An illustration of mk: the editor with Harper underlines beside the live preview">
@@ -101,11 +101,11 @@ I <u class="sp">recieved</u> the draft yesterday.
         </article>
         <article>
           <h3><span class="glyph">⚙</span>Settings as plain files</h3>
-          <p>You get light and dark themes and five English dialects (American, British, Canadian, Australian, Indian), and you can switch Harper's rules on or off one by one. Settings, your dictionary and ignored issues are plain files in <code>~/.config/mk/</code>.</p>
+          <p>You get light and dark themes and five English dialects (American, British, Canadian, Australian, Indian), and you can switch Harper's rules on or off one by one. Settings, your dictionary and ignored issues are plain files in <code>~/.config/mk/</code> (<code>%APPDATA%\mk\</code> on Windows).</p>
         </article>
         <article>
           <h3><span class="glyph">⌂</span>At home on the desktop</h3>
-          <p>Run <code>mk notes.md</code> from a terminal, or <code>mk -v</code> for a preview-only view. The installer adds mk to your file manager's “Open With” menu for Markdown files. Links to other Markdown files open in mk.</p>
+          <p>Run <code>mk notes.md</code> from a terminal, or <code>mk -v</code> for a preview-only view. The installer adds mk to the “Open With” menu for Markdown files. Links to other Markdown files open in mk.</p>
         </article>
       </div>
     </section>
@@ -133,13 +133,22 @@ I <u class="sp">recieved</u> the draft yesterday.
     </section>
 
     <section id="install" class="install">
-      <h2>Build and install</h2>
-      <p>You need Rust 1.85 or newer, Node 20 or newer, and the WebKitGTK packages Tauri 2 uses on Linux (<code>libwebkit2gtk-4.1-dev</code>, <code>libgtk-3-dev</code>, <code>libsoup-3.0-dev</code>).</p>
+      <h2>Download and install</h2>
+      <p>Installers for each platform are on the <a href="https://github.com/dsasante1/mk/releases">releases page</a>:</p>
+      <ul>
+        <li><strong>macOS</strong> (Apple silicon and Intel): open the <code>.dmg</code> and drag mk to Applications.</li>
+        <li><strong>Windows</strong> 10 and 11: run the <code>-setup.exe</code> or the <code>.msi</code>.</li>
+        <li><strong>Linux</strong>: install the <code>.deb</code> or <code>.rpm</code>, or run the AppImage.</li>
+      </ul>
+      <p>The installers aren't code-signed yet, so the first launch shows a warning. On a Mac, right-click mk in Applications, choose Open, then Open again. On Windows, click More info, then Run anyway. On a Mac, use Cmd wherever these pages say Ctrl.</p>
+
+      <h3>Build from source</h3>
+      <p>You need Rust 1.85 or newer and Node 20 or newer. On Linux you also need the WebKitGTK packages (<code>libwebkit2gtk-4.1-dev</code>, <code>libgtk-3-dev</code>, <code>libsoup-3.0-dev</code>). On macOS you need the Xcode Command Line Tools, and on Windows the Microsoft C++ Build Tools.</p>
 <pre class="code"><code>git clone https://github.com/dsasante1/mk.git
 cd mk
-./run.sh samples/tour.md   <span class="c"># build once (a few minutes), then open</span>
-./install.sh               <span class="c"># put `mk` on your PATH and in "Open With"</span></code></pre>
-      <p>Run <code>npx tauri build</code> instead to get a <code>.deb</code> and an AppImage.</p>
+npm install
+npx tauri build            <span class="c"># this platform's installers</span></code></pre>
+      <p>On Linux you can instead run <code>./run.sh samples/tour.md</code> to build and open mk, then <code>./install.sh</code> to put <code>mk</code> on your PATH and in “Open With”.</p>
     </section>
   </main>
 
