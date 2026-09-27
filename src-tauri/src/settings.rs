@@ -65,6 +65,11 @@ impl Default for Settings {
 }
 
 pub fn dir() -> PathBuf {
+    // Windows has no HOME as a rule; its per-user settings go in %APPDATA%.
+    #[cfg(windows)]
+    if let Some(x) = std::env::var_os("APPDATA").filter(|v| !v.is_empty()) {
+        return PathBuf::from(x).join("mk");
+    }
     if let Some(x) = std::env::var_os("XDG_CONFIG_HOME").filter(|v| !v.is_empty()) {
         return PathBuf::from(x).join("mk");
     }

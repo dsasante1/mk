@@ -12,6 +12,25 @@ mk a.md b.md c.md               # open several files, one tab each
 mk -v README.md                 # open in preview-only mode
 ```
 
+The scripts above are for Linux. For macOS and Windows, see [Installing](#installing).
+
+## Installing
+
+Installers for each platform are attached to each [GitHub Release](https://github.com/dsasante1/mk/releases):
+
+| Platform | Download | Notes |
+| --- | --- | --- |
+| Linux | `.deb`, `.rpm` or `.AppImage` | Or build from source and run `./install.sh`, below. |
+| macOS (Apple silicon and Intel) | `.dmg` | Open it and drag mk to Applications. |
+| Windows 10 and 11 | `-setup.exe` or `.msi` | Run it and follow the steps. |
+
+The installers are not code-signed yet, so the first launch shows a warning:
+
+- **macOS** says mk "cannot be opened because the developer cannot be verified". Right-click mk in Applications, choose **Open**, then choose **Open** again. You only need to do this once.
+- **Windows** SmartScreen says "Windows protected your PC". Click **More info**, then **Run anyway**.
+
+On a Mac, the keys below use Cmd where they say Ctrl.
+
 ## What it does
 
 **Editing.** A CodeMirror 6 editor set up for prose. Headings, emphasis, links and code are styled in place, fenced code is highlighted in its own language, and lists continue when you press Enter. It also has find and replace, multiple cursors and full undo history.
@@ -74,7 +93,7 @@ You can also drop files on the window to open them.
 
 ## Settings
 
-Settings live in `~/.config/mk/` (or `$XDG_CONFIG_HOME/mk/`):
+Settings live in `~/.config/mk/` (or `$XDG_CONFIG_HOME/mk/`) on Linux and macOS, and in `%APPDATA%\mk\` on Windows:
 
 - `settings.json` holds the theme, view, font, wrapping, dialect (American, British, Canadian, Australian, Indian) and per-rule overrides. Rules you have not touched follow Harper's defaults, so rules added in a newer Harper arrive switched on. A malformed file never stops mk from starting. A field with the wrong type falls back to its default on its own, and keys mk does not recognise are kept when it saves.
 - `dictionary.txt` is your personal dictionary, one word per line. You can edit it by hand.
@@ -82,12 +101,20 @@ Settings live in `~/.config/mk/` (or `$XDG_CONFIG_HOME/mk/`):
 
 ## Building
 
-You need Rust 1.85 or newer, Node 20 or newer, and the WebKitGTK development packages Tauri 2 uses on Linux (`libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libsoup-3.0-dev`).
+You need Rust 1.85 or newer and Node 20 or newer, plus what Tauri 2 needs on your platform:
+
+- **Linux:** the WebKitGTK development packages (`libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libsoup-3.0-dev`).
+- **macOS:** the Xcode Command Line Tools (`xcode-select --install`).
+- **Windows:** the Microsoft C++ Build Tools ("Desktop development with C++") and WebView2, which Windows 10 and 11 already include.
+
+`npx tauri build` makes this platform's installers: `.deb`, `.rpm` and AppImage on Linux, `.app` and `.dmg` on macOS, and `.msi` and a setup `.exe` on Windows. `run.sh` and `install.sh` are Linux only.
+
+To publish a release, push a version tag (`git tag v0.2.0 && git push origin v0.2.0`). The Release workflow builds the installers on all three platforms and attaches them to a draft GitHub Release. Check the draft, then publish it.
 
 ```sh
 npm install
 npx tauri build --no-bundle     # binary at src-tauri/target/release/mk
-npx tauri build                 # also a .deb and an AppImage
+npx tauri build                 # also this platform's installers
 npm run app                     # dev build with hot reload
 
 npm test                        # frontend unit tests (vitest)
