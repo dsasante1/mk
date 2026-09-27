@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>mk — Markdown editor with Harper</title>
+  <meta name="description" content="A standalone Markdown viewer and editor for Linux with the Harper grammar checker built in. Spelling, grammar and style, checked on your machine as you type.">
+  <meta name="color-scheme" content="light dark">
+  <meta property="og:title" content="mk — Markdown editor with Harper">
+  <meta property="og:description" content="Spelling, grammar and style, checked on your machine as you type.">
+  <meta property="og:image" content="/icon.png">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/"><img src="/favicon.png" alt="" width="28" height="28"> mk</a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#keys">Keys</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/dsasante1/mk">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-text">
+        <img class="hero-icon" src="/icon.png" alt="The mk icon: a Markdown mark over a green squiggle" width="112" height="112">
+        <h1>Write Markdown.<br>Harper checks it as you type.</h1>
+        <p class="lede">mk is a standalone Markdown viewer and editor for Linux with the <a href="https://github.com/automattic/harper">Harper</a> grammar checker built in. Spelling, grammar and style are checked on your machine. There's no server, no account, and nothing else to install.</p>
+        <div class="cta">
+          <a class="button primary" href="#install">Build and install</a>
+          <a class="button" href="https://github.com/dsasante1/mk">View source</a>
+        </div>
+        <p class="meta">Free and open source · MIT licence · Linux (.deb, AppImage)</p>
+      </div>
+
+      <figure class="window" aria-label="An illustration of mk: the editor with Harper underlines beside the live preview">
+        <div class="titlebar">
+          <span class="dots"><i></i><i></i><i></i></span>
+          <span class="tab active">notes.md</span>
+          <span class="tab">README.md <b>•</b></span>
+        </div>
+        <div class="panes">
+          <pre class="editor"><span class="md-h"># Launch notes</span>
+
+<span class="md-li">- [x]</span> Fix the typos
+<span class="md-li">- [ ]</span> Add a screenshot
+
+She <u class="gr">have</u> an unique idea.
+<u class="st">In order to</u> ship, we test first.
+I <u class="sp">recieved</u> the draft yesterday.
+<span class="popover" role="presentation"><span class="pop-kind">Spelling</span><span class="pop-msg">Did you mean “received”?</span><span class="pop-fix">received</span><span class="pop-act">Add to dictionary · Ignore here</span></span></pre>
+          <div class="preview">
+            <h3>Launch notes</h3>
+            <p class="task"><span class="box on">✓</span> Fix the typos</p>
+            <p class="task"><span class="box"></span> Add a screenshot</p>
+            <p>She have an unique idea. In order to ship, we test first. I recieved the draft yesterday.</p>
+          </div>
+        </div>
+      </figure>
+    </section>
+
+    <section class="legend" aria-label="What the underline colours mean">
+      <div><u class="sp">Spelling</u><span>Spelling and typos</span></div>
+      <div><u class="gr">Grammar</u><span>Agreement, punctuation, capitalisation, repetition, usage</span></div>
+      <div><u class="st">Style</u><span>Readability, redundancy, word choice</span></div>
+    </section>
+
+    <section id="features" class="features">
+      <h2>Features</h2>
+      <div class="grid">
+        <article>
+          <h3><span class="glyph">✓</span>Harper, built in</h3>
+          <p>mk links Harper's engine as a library, so it isn't running a language server beside the editor. It checks spelling, grammar and style as you type, and skips code blocks, inline code and front matter.</p>
+        </article>
+        <article>
+          <h3><span class="glyph">⚡</span>Fix issues where they are</h3>
+          <p>Every underline offers Harper's fixes plus <strong>Add to dictionary</strong>, <strong>Ignore here</strong> and <strong>Turn off rule</strong>. Ignored issues stay ignored across edits and restarts. To get to them, hover an underline, press <kbd>Ctrl</kbd>+<kbd>.</kbd>, or open the issues panel.</p>
+        </article>
+        <article>
+          <h3><span class="glyph">✎</span>An editor made for prose</h3>
+          <p>mk uses CodeMirror 6. Headings, emphasis, links and code are styled in place, fenced code is highlighted in its own language, and lists continue when you press Enter. It also has find and replace, multiple cursors and full undo history.</p>
+        </article>
+        <article>
+          <h3><span class="glyph">◧</span>Live preview</h3>
+          <p>The preview uses GitHub-flavoured rendering: tables, task lists, strikethrough, autolinks, heading anchors, highlighted code and front matter. It scrolls in step with the editor. Ticking a task in the preview updates the source.</p>
+        </article>
+        <article>
+          <h3><span class="glyph">⧉</span>Tabs for several files</h3>
+          <p>Open files from the dialog, the command line or by dropping them on the window. Each tab keeps its own undo history, cursor and scroll position, and a tab with unsaved changes asks before it closes.</p>
+        </article>
+        <article>
+          <h3><span class="glyph">☰</span>A section rail</h3>
+          <p>Each heading gets a dash at the edge of the page. The dash for your current section is highlighted and moves as you scroll. Click a dash to jump to that section, or hover over the dashes to see the headings by name.</p>
+        </article>
+        <article>
+          <h3><span class="glyph">↻</span>Keeps up with the file on disk</h3>
+          <p>If a file changes on disk, mk reloads it silently, or asks first if you have unsaved edits, so it works as a live viewer beside another editor. Saves are atomic and keep line endings, symlinks and permissions.</p>
+        </article>
+        <article>
+          <h3><span class="glyph">⚙</span>Settings as plain files</h3>
+          <p>You get light and dark themes and five English dialects (American, British, Canadian, Australian, Indian), and you can switch Harper's rules on or off one by one. Settings, your dictionary and ignored issues are plain files in <code>~/.config/mk/</code>.</p>
+        </article>
+        <article>
+          <h3><span class="glyph">⌂</span>At home on the desktop</h3>
+          <p>Run <code>mk notes.md</code> from a terminal, or <code>mk -v</code> for a preview-only view. The installer adds mk to your file manager's “Open With” menu for Markdown files. Links to other Markdown files open in mk.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="privacy">
+      <div>
+        <h2>Private by default</h2>
+        <p>Your text never leaves your machine. Untrusted documents are handled safely: raw HTML is sanitised and scripts can't run, local images load only from the document's own folder, and only <code>http</code>, <code>https</code> and <code>mailto</code> links open in your browser.</p>
+        <p class="note">One exception: the preview fetches remote images, as a browser would. To read an untrusted file without loading them, use the editor-only view (<kbd>Ctrl</kbd>+<kbd>1</kbd>).</p>
+      </div>
+    </section>
+
+    <section id="keys" class="keys">
+      <h2>Keys worth knowing</h2>
+      <dl>
+        <div><dt><kbd>Ctrl</kbd>+<kbd>.</kbd></dt><dd>Quick fix at the cursor</dd></div>
+        <div><dt><kbd>F8</kbd> / <kbd>Shift</kbd>+<kbd>F8</kbd></dt><dd>Next / previous issue</dd></div>
+        <div><dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></dt><dd>Harper issues panel</dd></div>
+        <div><dt><kbd>Ctrl</kbd>+<kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd></dt><dd>Editor, split, preview</dd></div>
+        <div><dt><kbd>Ctrl</kbd>+<kbd>Tab</kbd></dt><dd>Next tab</dd></div>
+        <div><dt><kbd>Ctrl</kbd>+<kbd>K</kbd></dt><dd>Insert a link</dd></div>
+        <div><dt><kbd>Ctrl</kbd>+<kbd>H</kbd></dt><dd>Cycle heading level</dd></div>
+        <div><dt><kbd>F7</kbd></dt><dd>Light / dark</dd></div>
+      </dl>
+    </section>
+
+    <section id="install" class="install">
+      <h2>Build and install</h2>
+      <p>You need Rust 1.85 or newer, Node 20 or newer, and the WebKitGTK packages Tauri 2 uses on Linux (<code>libwebkit2gtk-4.1-dev</code>, <code>libgtk-3-dev</code>, <code>libsoup-3.0-dev</code>).</p>
+<pre class="code"><code>git clone https://github.com/dsasante1/mk.git
+cd mk
+./run.sh samples/tour.md   <span class="c"># build once (a few minutes), then open</span>
+./install.sh               <span class="c"># put `mk` on your PATH and in "Open With"</span></code></pre>
+      <p>Run <code>npx tauri build</code> instead to get a <code>.deb</code> and an AppImage.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>mk is MIT licensed. Grammar checking is <a href="https://github.com/automattic/harper">Harper</a> by Automattic (Apache-2.0). The icon uses Dustin Curtis's public-domain <a href="https://github.com/dcurtis/markdown-mark">Markdown mark</a>.</p>
+    <p><a href="https://github.com/dsasante1/mk">github.com/dsasante1/mk</a></p>
+  </footer>
+</body>
+</html>
