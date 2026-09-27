@@ -889,6 +889,7 @@ async function boot() {
   $("btn-new").innerHTML = icons.newFile;
   $("btn-open").innerHTML = icons.open;
   $("btn-save").innerHTML = icons.save;
+  $("btn-find").innerHTML = icons.search;
   $("btn-settings").innerHTML = icons.settings;
   $("btn-problems-close").innerHTML = icons.close;
   $("btn-new").onclick = newDoc;
@@ -896,6 +897,10 @@ async function boot() {
   $("btn-save").onclick = () => void save();
   $("btn-settings").onclick = () => void settingsDialog.show();
   $("btn-theme").onclick = toggleTheme;
+  $("btn-find").onclick = () => {
+    if (findBar.isOpen) findBar.close();
+    else { closeSearchPanel(editor.view); findBar.open(); }
+  };
   $("btn-problems").onclick = () => setProblems(!settings.problemsOpen);
   $("btn-problems-close").onclick = () => setProblems(false);
   $("st-harper").onclick = () => setProblems(!settings.problemsOpen);
