@@ -23,7 +23,6 @@
   --hp-spelling: #d93a41;
   --hp-grammar: #c98500;
   --hp-style: #2f7ae5;
-  --green: #2e9e62;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -47,7 +46,6 @@
     --hp-spelling: #f06a70;
     --hp-grammar: #e8b33a;
     --hp-style: #5b9cf5;
-    --green: #5fce8f;
   }
 }
 
@@ -303,7 +301,6 @@ u.st { text-decoration-color: var(--hp-style); text-decoration-style: dotted; te
   border-radius: 14px;
   background: var(--bg-sunk);
   border: 1px solid var(--border);
-  border-left: 4px solid var(--green);
 }
 .privacy h2 { margin-bottom: 12px; }
 .privacy p { margin: 0 0 12px; max-width: 46em; }
