@@ -9,6 +9,7 @@ import "./styles.css";
 import { Text, type EditorState } from "@codemirror/state";
 import type { EditorView, ViewUpdate } from "@codemirror/view";
 import { nextDiagnostic, previousDiagnostic } from "@codemirror/lint";
+import { closeSearchPanel, openSearchPanel, searchPanelOpen, SearchQuery, setSearchQuery } from "@codemirror/search";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { homeDir } from "@tauri-apps/api/path";
@@ -17,6 +18,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 
 import { api, type Issue, type Settings, type View } from "./api";
 import { Editor } from "./editor";
+import { FindBar, findHighlight } from "./find";
 import { Grammar, groupOf, GROUP_LABEL, ruleLabel, type Group } from "./grammar";
 import { headings } from "./markdown";
 import { Preview } from "./preview";
@@ -181,10 +183,30 @@ const sectionNav = new SectionNav($("section-nav"), {
   },
 });
 
+// ---------------------------------------------------------------- find
+
+const findBar = new FindBar($("find"), {
+  editor: () => editor.view,
+  preview: preview.el,
+  pane: preview.pane,
+  previewShown: () => settings.view !== "edit",
+  previewOnly: () => settings.view === "preview",
+});
+
+/** CodeMirror's own panel, for replacing: it starts from whatever the find bar held. */
+function openReplace() {
+  const { query, caseSensitive } = findBar.state;
+  findBar.close();
+  ensureEditor();
+  openSearchPanel(editor.view);
+  if (query) editor.view.dispatch({ effects: setSearchQuery.of(new SearchQuery({ search: query, caseSensitive, literal: true })) });
+}
+
 /** After an edit, a new document or a new view: preview first, so its layout is current. */
 function refresh() {
   renderPreview();
   sectionNav.set(headings(editor.text()));
+  findBar.refresh();
 }
 
 function onUpdate(u: ViewUpdate) {
@@ -254,6 +276,7 @@ function setView(v: View, persist = true) {
   applySplit();
   if (v !== "edit") renderPreview();
   if (v !== "preview") editor?.view.requestMeasure();
+  if (editor) findBar.refresh();
   sectionNav.schedule();
   if (persist) saveSettingsSoon();
 }
@@ -552,6 +575,7 @@ function showDoc() {
   window.clearTimeout(previewTimer);
   if (settings.view !== "edit") preview.render(editor.text());
   sectionNav.set(headings(editor.text()));
+  findBar.refresh();
   editor.view.focus();
 }
 
@@ -675,6 +699,7 @@ async function saveAs(): Promise<boolean> {
     preview.setDir(dirName(path));
     void grammar.reset(path);
     renderPreview();
+    findBar.refresh();
     updateTitle();
   }
   return ok;
@@ -764,6 +789,7 @@ function onKey(e: KeyboardEvent) {
     // Esc closes the innermost open thing and is otherwise nothing. It is
     // never how you quit, and never how you lose work.
     if (settingsDialog.open) return;
+    if (findBar.isOpen) { findBar.close(); stop(); return; }
     if (!$("banner").hidden) { hideBanner(); stop(); }
     return;
   }
@@ -775,6 +801,13 @@ function onKey(e: KeyboardEvent) {
   if (mod && e.key === "Tab") { stop(); cycleTab(e.shiftKey ? -1 : 1); return; }
   if (mod && e.key === "PageDown") { stop(); cycleTab(1); return; }
   if (mod && e.key === "PageUp") { stop(); cycleTab(-1); return; }
+  if (mod && !e.shiftKey && k === "f") { stop(); closeSearchPanel(editor.view); findBar.open(); return; }
+  if (mod && e.shiftKey && k === "f") { stop(); openReplace(); return; }
+  // F3 and Ctrl+G step through the bar's matches, unless replace has them.
+  if (e.key === "F3" || (mod && !e.altKey && k === "g")) {
+    if (!findBar.isOpen && searchPanelOpen(editor.view.state)) return;
+    stop(); findBar.step(e.shiftKey ? -1 : 1); return;
+  }
   if (mod && !e.shiftKey && k === "q") { stop(); void win.close(); return; }
   if (mod && !e.shiftKey && e.key === ",") { stop(); void settingsDialog.show(); return; }
   if (mod && !e.shiftKey && (e.key === "1" || e.key === "2" || e.key === "3")) {
@@ -821,7 +854,7 @@ async function boot() {
   home = await homeDir().then((h) => h.replace(/\/$/, "")).catch(() => null);
   applyTheme();
 
-  editor = new Editor($("editor-pane"), settings, [], {
+  editor = new Editor($("editor-pane"), settings, [findHighlight], {
     onUpdate,
     keys: [],
   });

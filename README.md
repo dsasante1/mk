@@ -22,6 +22,8 @@ mk -v README.md                 # open in preview-only mode
 
 **Finding your place.** A short dash for each heading sits at the right edge of the page. The dash for the section you are reading is longer and coloured, and it moves as you scroll. Click a dash to go to its section, or hover over the dashes to see the headings by name. It works in the editor-only view too, and you can turn it off in Settings.
 
+**Finding text.** Ctrl+F opens a find bar that works in every view. Every match is highlighted as you type, and the bar counts them ("3 of 12"). Enter and Shift+Enter (or F3 and Shift+F3) move to the next and previous match, wrapping at the ends. When the editor is showing, each match is selected in the source, and in split view the preview follows. In preview-only view the bar searches the rendered text, so "foo bar" finds `foo **bar**`, and moving to a match scrolls the preview to it. Aa turns on match case. Esc closes the bar and leaves the last match selected. Ctrl+Shift+F opens find and replace in the editor, starting from whatever you searched for.
+
 **Harper.** Underlines come in three colours:
 
 | | Group | Harper kinds |
@@ -61,7 +63,8 @@ Everything else about an untrusted document is contained. Raw HTML in the previe
 | Ctrl+B / Ctrl+I / Ctrl+` / Ctrl+Shift+X | Bold, italic, code, strikethrough (toggle) |
 | Ctrl+K | Link. The URL placeholder is selected, ready to type over |
 | Ctrl+H | Cycle heading level |
-| Ctrl+F | Find and replace |
+| Ctrl+F | Find in any view (Enter / Shift+Enter, or F3 / Shift+F3, to step through matches; Esc closes) |
+| Ctrl+Shift+F | Find and replace in the editor |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Font size |
 | F7 | Toggle light and dark |
 | Ctrl+, | Settings |
