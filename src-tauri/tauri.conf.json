@@ -44,7 +44,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "category": "Office",
+    "category": "Productivity",
     "shortDescription": "Markdown editor with grammar checking",
     "longDescription": "A Markdown viewer and editor with the Harper grammar checker built in.",
     "fileAssociations": [
