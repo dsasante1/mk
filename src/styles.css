@@ -30,6 +30,7 @@
   --selection: #3563e92e;
   --active-line: #0000000a;
   --match: #f5c84255;
+  --match-on: #ff8a1fa6;
   --hover: #0000000d;
   --shadow: 0 10px 30px #0f14191f, 0 2px 6px #0f141914;
   --hp-spelling: #d93a41;
@@ -63,6 +64,7 @@
   --selection: #7b9cff3d;
   --active-line: #ffffff08;
   --match: #f5c84233;
+  --match-on: #ff8a1f8c;
   --hover: #ffffff0f;
   --shadow: 0 14px 40px #00000073, 0 2px 8px #00000059;
   --hp-spelling: #ff6b70;
@@ -212,6 +214,24 @@ button:disabled { opacity: 0.45; cursor: default; }
 
 /* Keep wrapped editor text clear of the rail when the editor is the page. */
 #workspace.has-sections[data-view="edit"] .cm-line { padding-right: 56px; }
+
+/* ---------------------------------------------------------------- find */
+
+#find {
+  position: absolute; z-index: 20; top: 10px; right: calc(var(--problems-w) + 20px);
+  display: flex; align-items: center; gap: 2px; padding: 4px;
+  background: var(--bg-raised); border: 1px solid var(--border); border-radius: 9px; box-shadow: var(--shadow);
+}
+#find input { width: 220px; background: var(--bg-sunk); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; outline: none; }
+#find input:focus { border-color: var(--accent); }
+#find.none input { border-color: var(--hp-spelling); }
+.find-count { min-width: 70px; padding: 0 6px; text-align: center; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#find.none .find-count { color: var(--hp-spelling); }
+.find-case { font-size: 12px; font-weight: 600; }
+.find-case[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+
+.cm-find, .markdown-body mark.find-hit { background: var(--match); color: inherit; border-radius: 2px; }
+.cm-find-on, .markdown-body mark.find-hit.on { background: var(--match-on); }
 
 /* ---------------------------------------------------------------- Harper in the editor */
 
