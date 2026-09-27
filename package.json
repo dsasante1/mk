@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "description": "A Markdown viewer and editor with Harper grammar checking built in.",
+  "license": "MIT",
+  "repository": "github:dsasante1/mk",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

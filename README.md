@@ -2,7 +2,7 @@
 
 A standalone Markdown viewer and editor with [Harper](https://github.com/automattic/harper) built in.
 
-Harper runs inside the app as a library (`harper-core`), not as a language server beside it, so there is nothing else to install. It checks your prose as you type: spelling, grammar and style. Code blocks, inline code and front matter are skipped, and nothing leaves your machine.
+Harper runs inside the app as a library (`harper-core`), not as a language server beside it, so there is nothing else to install. It checks your prose as you type: spelling, grammar and style. Code blocks, inline code and front matter are skipped, and your text never leaves your machine.
 
 ```sh
 ./run.sh samples/tour.md        # build once (a few minutes), then open
@@ -39,6 +39,12 @@ Each issue offers Harper's fixes plus three more actions:
 You can reach these actions by hovering an underline, pressing Ctrl+. on it, or using the issues panel (Ctrl+Shift+M). The panel lists every issue with its context and can be filtered by group.
 
 **Staying current.** mk polls the open file every two seconds. If it changes on disk and you have no unsaved edits, mk reloads it silently, so you can leave it open as a viewer beside another editor. If you do have unsaved edits, mk asks before reloading. Line endings (LF or CRLF) are kept as they were. Saves are atomic, and they keep symlinks and file permissions intact.
+
+## Privacy and untrusted files
+
+Grammar checking runs entirely on your machine. The one thing that goes over the network is a remote image: when a document contains `![](https://…)`, the preview fetches it, as a browser or GitHub would. That means opening a Markdown file someone else wrote can tell the server hosting its images that the file was opened, and from what IP address. Read untrusted documents in the editor-only view (Ctrl+1) if that matters to you.
+
+Everything else about an untrusted document is contained. Raw HTML in the preview is sanitised and scripts cannot run. The preview can load local images only from the document's own folder. Links open in your browser only if they are `http`, `https` or `mailto`, and a relative link opens only if it points to a Markdown file.
 
 ## Keys
 
@@ -98,3 +104,9 @@ cargo test --manifest-path src-tauri/Cargo.toml    # Harper bridge, settings, CL
 | `src/markdown.ts`, `src/preview.ts` | Rendering with source-line anchors, sanitising, images, links and scroll sync. |
 | `src/section-nav.ts` | The section rail: which heading you are under, and jumping between them. |
 | `src/main.ts` | The app shell. |
+
+## Credits and licence
+
+mk is released under the [MIT licence](LICENSE).
+
+Grammar checking is [Harper](https://github.com/automattic/harper) by Automattic, licensed under Apache-2.0. mk also builds on [Tauri](https://tauri.app), [CodeMirror](https://codemirror.net), [markdown-it](https://github.com/markdown-it/markdown-it), [DOMPurify](https://github.com/cure53/DOMPurify) and [highlight.js](https://highlightjs.org), each under its own permissive licence.

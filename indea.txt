@@ -1,1 +1,0 @@
-create a standalone markdown viewer and editory with haper - (https://github.com/automattic/harper) integrated into it. 
