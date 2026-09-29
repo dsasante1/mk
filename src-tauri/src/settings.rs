@@ -36,6 +36,8 @@ pub struct Settings {
     pub problems_open: bool,
     pub grammar: bool,
     pub dialect: String,
+    /// Write a document with a path a moment after each edit.
+    pub auto_save: bool,
     /// Harper rule overrides by rule name; absent means Harper's default.
     pub rules: BTreeMap<String, bool>,
     /// Keys a newer build wrote. Kept so a save cannot drop them.
@@ -58,6 +60,7 @@ impl Default for Settings {
             problems_open: false,
             grammar: true,
             dialect: "American".into(),
+            auto_save: false,
             rules: BTreeMap::new(),
             extra: Map::new(),
         }
@@ -192,6 +195,14 @@ mod tests {
         assert_eq!(s.font_size, 15);
         assert_eq!(s.theme, "light");
         assert!(!s.wrap);
+    }
+
+    #[test]
+    fn auto_save_is_off_unless_asked_for() {
+        assert!(!Settings::default().auto_save);
+        assert!(!parse(r#"{ "theme": "dark" }"#).auto_save);
+        assert!(parse(r#"{ "autoSave": true }"#).auto_save);
+        assert!(!parse(r#"{ "autoSave": "yes", "wrap": false }"#).auto_save);
     }
 
     #[test]
