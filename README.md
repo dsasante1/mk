@@ -61,6 +61,8 @@ You can reach these actions by hovering an underline, pressing Ctrl+. on it, or 
 
 **Staying current.** mk polls the open file every two seconds. If it changes on disk and you have no unsaved edits, mk reloads it silently, so you can leave it open as a viewer beside another editor. If you do have unsaved edits, mk asks before reloading. Line endings (LF or CRLF) are kept as they were. Saves are atomic, and they keep symlinks and file permissions intact.
 
+**Auto save.** Turn on "Save automatically" in Settings and mk saves each file about a second after you stop typing. It also saves when you switch tabs or leave the window, and it saves files as you close them instead of asking. Auto save is off by default. Untitled documents still need Ctrl+S the first time, because mk will not choose a name for you. If another program changes a file while you have unsaved edits, auto save stops for that file and the usual reload question decides. If a save fails, mk tells you once and tries again after your next edit.
+
 ## Privacy and untrusted files
 
 Grammar checking runs entirely on your machine. The one thing that goes over the network is a remote image: when a document contains `![](https://…)`, the preview fetches it, as a browser or GitHub would. That means opening a Markdown file someone else wrote can tell the server hosting its images that the file was opened, and from what IP address. Read untrusted documents in the editor-only view (Ctrl+1) if that matters to you.
@@ -95,7 +97,7 @@ You can also drop files on the window to open them.
 
 Settings live in `~/.config/mk/` (or `$XDG_CONFIG_HOME/mk/`) on Linux and macOS, and in `%APPDATA%\mk\` on Windows:
 
-- `settings.json` holds the theme, view, font, wrapping, dialect (American, British, Canadian, Australian, Indian) and per-rule overrides. Rules you have not touched follow Harper's defaults, so rules added in a newer Harper arrive switched on. A malformed file never stops mk from starting. A field with the wrong type falls back to its default on its own, and keys mk does not recognise are kept when it saves.
+- `settings.json` holds the theme, view, font, wrapping, auto save, dialect (American, British, Canadian, Australian, Indian) and per-rule overrides. Rules you have not touched follow Harper's defaults, so rules added in a newer Harper arrive switched on. A malformed file never stops mk from starting. A field with the wrong type falls back to its default on its own, and keys mk does not recognise are kept when it saves.
 - `dictionary.txt` is your personal dictionary, one word per line. You can edit it by hand.
 - `ignored.json` holds the issues you ignored, by file.
 

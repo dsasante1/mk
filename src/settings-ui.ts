@@ -71,6 +71,11 @@ export class SettingsDialog {
     body.append(this.toggle("Sync preview scrolling with the editor", s.syncScroll, (v) => this.set({ syncScroll: v })));
     body.append(this.toggle("Section markers at the edge of the page", s.sectionNav, (v) => this.set({ sectionNav: v })));
 
+    // ---- saving ----
+    body.append(h("h3", {}, "Saving"));
+    body.append(this.toggle("Save automatically a second after you stop typing", s.autoSave, (v) => this.set({ autoSave: v })));
+    body.append(h("p", { class: "hint" }, "Untitled documents still wait for Ctrl+S. A file changed by another program is never overwritten without asking."));
+
     // ---- grammar ----
     body.append(h("h3", {}, "Harper"));
     body.append(this.toggle("Check spelling and grammar", s.grammar, (v) => this.set({ grammar: v })));

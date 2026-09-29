@@ -17,6 +17,7 @@ import { open as openDialog, save as saveDialog, message } from "@tauri-apps/plu
 import { openUrl } from "@tauri-apps/plugin-opener";
 
 import { api, type Issue, type Settings, type View } from "./api";
+import { AutoSave, blocked } from "./autosave";
 import { Editor } from "./editor";
 import { FindBar, findHighlight } from "./find";
 import { Grammar, groupOf, GROUP_LABEL, ruleLabel, type Group } from "./grammar";
@@ -56,6 +57,8 @@ interface Tab {
   mtime: number | null;
   /** Set while our own save is in flight, so the watcher does not see it as someone else's. */
   writing: boolean;
+  /** The last write queued. Writes to one file go one at a time: they share a temporary file. */
+  queue: Promise<unknown>;
   /** The editor state while another tab has the editor; null while this one does. */
   state: EditorState | null;
   scroll: ReturnType<EditorView["scrollSnapshot"]> | null;
@@ -63,7 +66,7 @@ interface Tab {
 }
 
 const newTab = (): Tab =>
-  ({ path: null, eol: "\n", saved: Text.empty, mtime: null, writing: false, state: null, scroll: null, previewTop: 0 });
+  ({ path: null, eol: "\n", saved: Text.empty, mtime: null, writing: false, queue: Promise.resolve(), state: null, scroll: null, previewTop: 0 });
 
 let doc = newTab();
 const tabs: Tab[] = [doc];
@@ -110,6 +113,7 @@ function saveSettingsSoon() {
 
 function applySettings(next: Settings) {
   const grammarWas = settings?.grammar;
+  const autoSaveWas = settings?.autoSave;
   settings = next;
   applyTheme();
   editor?.apply(settings);
@@ -117,6 +121,8 @@ function applySettings(next: Settings) {
   setProblems(settings.problemsOpen, false);
   if (grammar && grammarWas !== settings.grammar) grammar.setEnabled(settings.grammar);
   sectionNav.setEnabled(settings.sectionNav);
+  // Switched on with edits outstanding: those are saved too, not only the next.
+  if (settings.autoSave && autoSaveWas === false) for (const t of tabs) autoSave.schedule(t);
   updateStatus();
 }
 
@@ -215,6 +221,7 @@ function onUpdate(u: ViewUpdate) {
     window.clearTimeout(previewTimer);
     previewTimer = window.setTimeout(refresh, 120);
     updateTitle();
+    autoSave.schedule(doc);
   }
   if (u.docChanged || u.selectionSet) updateStatus();
 }
@@ -596,8 +603,10 @@ function enter(t: Tab) {
 
 function activate(t: Tab) {
   if (t === doc || !tabs.includes(t)) return;
+  const left = doc;
   stash();
   enter(t);
+  void autoSave.flush(left);
 }
 
 function cycleTab(step: number) {
@@ -617,6 +626,8 @@ function addTab(text: string): Tab {
 
 async function closeTab(t: Tab) {
   if (!tabs.includes(t)) return;
+  await autoSave.flush(t);
+  if (!tabs.includes(t)) return;
   if (isDirty(t)) {
     activate(t);
     if (!(await confirmDiscard("Close"))) return;
@@ -624,6 +635,7 @@ async function closeTab(t: Tab) {
   const i = tabs.indexOf(t);
   if (i < 0) return;
   tabs.splice(i, 1);
+  autoSave.cancel(t);
   if (t !== doc) { renderTabs(); return; }
   // The last tab closed leaves an empty one, not an empty window.
   if (tabs.length === 0) tabs.push(newTab());
@@ -682,20 +694,22 @@ function newDoc() {
 
 async function save(): Promise<boolean> {
   if (!doc.path) return saveAs();
-  return writeTo(doc.path);
+  return writeTo(doc, doc.path);
 }
 
 async function saveAs(): Promise<boolean> {
+  // The tab, not `doc`: the user may switch tabs while the dialog or write is out.
+  const t = doc;
   const picked = await saveDialog({
     filters: MD_FILTERS,
-    defaultPath: doc.path ?? (home ? `${home}/Untitled.md` : "Untitled.md"),
+    defaultPath: t.path ?? (home ? `${home}/Untitled.md` : "Untitled.md"),
   });
   if (!picked) return false;
   const path = /\.[^/\\]+$/.test(baseName(picked)) ? picked : `${picked}.md`;
-  const was = doc.path;
-  const ok = await writeTo(path);
-  if (ok && path !== was) {
-    doc.path = path;
+  const was = t.path;
+  const ok = await writeTo(t, path);
+  // A tab in the background picks its new folder up when it is shown.
+  if (ok && path !== was && t === doc) {
     preview.setDir(dirName(path));
     void grammar.reset(path);
     renderPreview();
@@ -705,25 +719,88 @@ async function saveAs(): Promise<boolean> {
   return ok;
 }
 
-async function writeTo(path: string): Promise<boolean> {
-  // The tab, not `doc`: the user may switch tabs while the write is out.
-  const t = doc;
-  const snapshot = editor.doc;
+async function writeTo(t: Tab, path: string): Promise<boolean> {
+  try {
+    await queued(t, () => writeNow(t, path));
+    toast(`Saved ${baseName(path)}`, 1400);
+    return true;
+  } catch (e) {
+    await message(String(e), { title: "Could not save", kind: "error" });
+    return false;
+  }
+}
+
+/** Run `job` after any write of `t` already out. Writes of one file go one at a time: they share a temporary file. */
+function queued(t: Tab, job: () => Promise<void>): Promise<void> {
+  const run = t.queue.then(job);
+  t.queue = run.catch(() => {});
+  return run;
+}
+
+/** Write `t` to `path` and mark it saved. Only from inside `queued`. */
+async function writeNow(t: Tab, path: string) {
+  // Taken now, not when queued, so the newest text is what lands.
+  const snapshot = textOf(t);
   t.writing = true;
   try {
     t.mtime = await api.writeFile(path, withEol(snapshot.toString(), t.eol));
     t.path = path;
     t.saved = snapshot;
     updateTitle();
-    toast(`Saved ${baseName(path)}`, 1400);
-    return true;
-  } catch (e) {
-    await message(String(e), { title: "Could not save", kind: "error" });
-    return false;
   } finally {
     t.writing = false;
   }
 }
+
+// ---------------------------------------------------------------- auto save
+//
+// Quiet on success: the unsaved dot going away is the whole signal. A failure
+// or a file changed underneath says so once, then waits for the next edit,
+// rather than a dialog every second while you type.
+
+type AutoSaveTrouble = "changed" | "failed";
+const autoSaveWarned = new WeakMap<Tab, AutoSaveTrouble>();
+let closing = false;
+
+function autoSaveWarn(t: Tab, trouble: AutoSaveTrouble, msg: string) {
+  // While the window closes, the prompt for each unsaved tab says it all.
+  if (closing || autoSaveWarned.get(t) === trouble) return;
+  autoSaveWarned.set(t, trouble);
+  toast(msg, 5000);
+}
+
+/**
+ * Queued like any write, so the disk is checked just before this write and
+ * not before whatever was ahead of it, and a Ctrl+S or Save As ahead of it
+ * is seen for what it did.
+ */
+function autoWrite(t: Tab): Promise<void> {
+  return queued(t, async () => {
+    const path = t.path;
+    if (!path || !tabs.includes(t) || !isDirty(t)) return;
+    const disk = await api.fileMtime(path).catch(() => null);
+    if (t.path !== path || !tabs.includes(t)) return;
+    const why = blocked(t, isDirty(t), disk);
+    if (why === "changed") {
+      // The current tab's banner asks about this, except for a file that did
+      // not exist when opened: the watcher has no time to compare it with.
+      if (t !== doc || t.mtime === null) autoSaveWarn(t, "changed", `${tabName(t)} changed on disk; auto save is paused for it`);
+      return;
+    }
+    if (why) return;
+    try {
+      await writeNow(t, path);
+      autoSaveWarned.delete(t);
+    } catch (e) {
+      autoSaveWarn(t, "failed", `Auto save failed: ${e}`);
+    }
+  });
+}
+
+const autoSave = new AutoSave<Tab>({
+  enabled: () => settings.autoSave,
+  write: autoWrite,
+});
 
 // ---------------------------------------------------------------- change on disk
 
@@ -751,6 +828,7 @@ async function reloadFromDisk(quiet: boolean) {
     editor.replaceKeepingPlace(d.content.replace(/\r\n?/g, "\n"));
     doc.saved = editor.doc;
     doc.mtime = d.mtime;
+    autoSaveWarned.delete(doc);
     updateTitle();
     if (!quiet) toast("Reloaded from disk");
   } catch (e) {
@@ -773,7 +851,7 @@ async function checkDisk() {
   const seen = m;
   showBanner(`${baseName(t.path)} changed on disk.`, [
     ["Reload (lose my edits)", () => void reloadFromDisk(false)],
-    ["Keep mine", () => { t.mtime = seen; }],
+    ["Keep mine", () => { t.mtime = seen; autoSaveWarned.delete(t); autoSave.schedule(t); }],
   ]);
 }
 
@@ -914,6 +992,7 @@ async function boot() {
   preview.pane.addEventListener("scroll", () => onScroll("preview", preview.pane), { passive: true });
   window.addEventListener("keydown", onKey, true);
   window.addEventListener("resize", () => sectionNav.schedule());
+  window.addEventListener("blur", () => void autoSave.flushAll());
   document.addEventListener("mousedown", (e) => {
     if (qf && !(e.target as HTMLElement).closest("#quickfix")) closeQuickFix();
   });
@@ -929,10 +1008,16 @@ async function boot() {
 
   // Every tab with unsaved work is asked about, in turn; one Cancel keeps the window.
   await win.onCloseRequested(async (e) => {
-    for (const t of [...tabs]) {
-      if (!isDirty(t)) continue;
-      activate(t);
-      if (!(await confirmDiscard("Close"))) { e.preventDefault(); return; }
+    closing = true;
+    try {
+      await Promise.all(tabs.map((t) => autoSave.flush(t)));
+      for (const t of [...tabs]) {
+        if (!isDirty(t)) continue;
+        activate(t);
+        if (!(await confirmDiscard("Close"))) { e.preventDefault(); return; }
+      }
+    } finally {
+      closing = false;
     }
   });
 

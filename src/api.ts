@@ -44,6 +44,7 @@ export interface Settings {
   problemsOpen: boolean;
   grammar: boolean;
   dialect: string;
+  autoSave: boolean;
   rules: Record<string, boolean>;
   // Keys a newer build wrote ride along untouched.
   [extra: string]: unknown;
