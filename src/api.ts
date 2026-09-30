@@ -82,6 +82,9 @@ export const api = {
   ignoredGet: (path: string) => invoke<string[]>("ignored_get", { path }),
   ignoreAdd: (path: string, hash: string) => invoke<void>("ignore_add", { path, hash }),
   ignoreClear: (path: string) => invoke<void>("ignore_clear", { path }),
+  recentGet: () => invoke<string[]>("recent_get"),
+  recentAdd: (path: string) => invoke<string[]>("recent_add", { path }),
+  recentClear: () => invoke<void>("recent_clear"),
   about: () => invoke<About>("about"),
 };
 

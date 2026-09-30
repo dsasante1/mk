@@ -39,6 +39,8 @@ On a Mac, the keys below use Cmd where they say Ctrl.
 
 **Several files at once.** Each open file gets a tab. Open several from the Open dialog, the command line or by dropping them on the window. A file that is already open is not opened twice. Each tab keeps its own undo history, cursor and scroll position. Click a tab or press Ctrl+Tab to switch between them. Click a tab's × (or middle-click the tab, or press Ctrl+W) to close it. A tab with unsaved changes shows a dot in place of the × and asks before it closes. Closing the window asks about every unsaved tab in turn.
 
+**Recent files.** The clock button in the top bar (or Ctrl+Shift+O) drops down the files you opened most recently, newest first, each with its folder. Click one — or use the arrow keys and Enter — to open it; Esc closes the menu. The list is kept across restarts and shared between windows, and "Clear recent files" empties it.
+
 **Finding your place.** A short dash for each heading sits at the right edge of the page. The dash for the section you are reading is longer and coloured, and it moves as you scroll. Click a dash to go to its section, or hover over the dashes to see the headings by name. It works in the editor-only view too, and you can turn it off in Settings.
 
 **Finding text.** Ctrl+F, or the magnifying-glass button in the top bar, opens a find bar that works in every view. Every match is highlighted as you type, and the bar counts them ("3 of 12"). Enter and Shift+Enter (or F3 and Shift+F3) move to the next and previous match, wrapping at the ends. When the editor is showing, each match is selected in the source, and in split view the preview follows. In preview-only view the bar searches the rendered text, so "foo bar" finds `foo **bar**`, and moving to a match scrolls the preview to it. Aa turns on match case. Esc closes the bar and leaves the last match selected. Ctrl+Shift+F opens find and replace in the editor, starting from whatever you searched for.
@@ -74,6 +76,7 @@ Everything else about an untrusted document is contained. Raw HTML in the previe
 | Key | |
 | --- | --- |
 | Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Shift+S | New tab, open, save, save as |
+| Ctrl+Shift+O | Recent files menu (arrows and Enter to open, Esc closes) |
 | Ctrl+Tab / Ctrl+Shift+Tab (or Ctrl+PageDown / PageUp) | Next / previous tab |
 | Ctrl+W | Close tab |
 | Ctrl+1 / Ctrl+2 / Ctrl+3 | Editor only, split, preview only |

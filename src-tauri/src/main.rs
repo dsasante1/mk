@@ -31,6 +31,7 @@ struct AppState {
     settings: Mutex<Settings>,
     words: Mutex<Vec<String>>,
     ignored: Mutex<BTreeMap<String, BTreeSet<String>>>,
+    recent: Mutex<Vec<String>>,
 }
 
 fn config_of(s: &Settings, words: &[String]) -> Config {
@@ -249,6 +250,28 @@ fn ignore_clear(state: State<'_, AppState>, path: String) -> Result<(), String> 
     Ok(())
 }
 
+#[tauri::command]
+fn recent_get(state: State<'_, AppState>) -> Vec<String> {
+    state.recent.lock().unwrap().clone()
+}
+
+/// A file the frontend just opened. Recorded here, where it can be written to
+/// disk, so the menu is the same the next time mk starts.
+#[tauri::command]
+fn recent_add(state: State<'_, AppState>, path: String) -> Result<Vec<String>, String> {
+    let mut r = state.recent.lock().unwrap();
+    settings::push_recent(&mut r, path);
+    settings::save_recent_to(&state.dir, &r)?;
+    Ok(r.clone())
+}
+
+#[tauri::command]
+fn recent_clear(state: State<'_, AppState>) -> Result<(), String> {
+    let mut r = state.recent.lock().unwrap();
+    r.clear();
+    settings::save_recent_to(&state.dir, &r)
+}
+
 #[derive(Serialize)]
 struct About {
     version: &'static str,
@@ -272,6 +295,7 @@ fn main() {
     let state = AppState {
         grammar: Grammar::start(config_of(&s, &words)),
         ignored: Mutex::new(settings::ignored_from(&dir)),
+        recent: Mutex::new(settings::recent_from(&dir)),
         settings: Mutex::new(s),
         words: Mutex::new(words),
         dir,
@@ -284,7 +308,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             launch, read_file, write_file, file_mtime, lint, grammar_rules,
             settings_get, settings_set, words_get, word_add, word_remove,
-            ignored_get, ignore_add, ignore_clear, about,
+            ignored_get, ignore_add, ignore_clear, recent_get, recent_add,
+            recent_clear, about,
         ])
         .run(tauri::generate_context!())
         .expect("error while running mk");

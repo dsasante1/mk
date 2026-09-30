@@ -11,6 +11,7 @@
         <div class="group">
           <button class="icon" id="btn-new" data-tip="New (Ctrl+N)"></button>
           <button class="icon" id="btn-open" data-tip="Open (Ctrl+O)"></button>
+          <button class="icon" id="btn-recent" data-tip="Recent files (Ctrl+Shift+O)" aria-haspopup="menu" aria-expanded="false"></button>
           <button class="icon" id="btn-save" data-tip="Save (Ctrl+S)"></button>
         </div>
         <div id="docname">
@@ -63,6 +64,7 @@
       </footer>
     </div>
     <div id="quickfix" hidden></div>
+    <div id="recent" role="menu" hidden></div>
     <dialog id="settings"></dialog>
     <div id="toasts"></div>
     <script type="module" src="/src/main.ts"></script>

@@ -490,6 +490,82 @@ function quickFixKey(e: KeyboardEvent): boolean {
   return false;
 }
 
+// ---------------------------------------------------------------- recent files
+//
+// A dropdown of the files opened lately, newest first. The list lives on the
+// Rust side so it survives restarts and is shared between windows; it is read
+// fresh each time the menu opens so a file opened in another window is there.
+
+let recentMenu: { items: string[]; index: number } | null = null;
+
+/** Note a file as opened, so it heads the recent list. Failures are silent: a menu is not worth a toast. */
+function rememberRecent(path: string) {
+  api.recentAdd(path).catch(() => {});
+}
+
+async function openRecent() {
+  if (recentMenu) { closeRecent(); return; }
+  const items = await api.recentGet().catch(() => [] as string[]);
+  const menu = $("recent");
+  menu.replaceChildren();
+  menu.append(Object.assign(document.createElement("div"), { className: "rc-head", textContent: "Recent files" }));
+
+  if (items.length === 0) {
+    menu.append(Object.assign(document.createElement("div"), { className: "rc-empty", textContent: "No files opened yet." }));
+  } else {
+    items.forEach((path, n) => {
+      const b = document.createElement("button");
+      b.className = "rc-item";
+      b.setAttribute("role", "menuitem");
+      b.title = tildify(path, home);
+      b.append(
+        Object.assign(document.createElement("span"), { className: "rc-name", textContent: baseName(path) }),
+        Object.assign(document.createElement("span"), { className: "rc-dir", textContent: tildify(dirName(path), home) }),
+      );
+      b.onmouseenter = () => { if (recentMenu) { recentMenu.index = n; paintRecent(); } };
+      b.onclick = () => { closeRecent(); void openPath(path); };
+      menu.append(b);
+    });
+    const foot = document.createElement("div");
+    foot.className = "rc-foot";
+    const clear = document.createElement("button");
+    clear.textContent = "Clear recent files";
+    clear.onclick = () => { closeRecent(); void api.recentClear().catch((e) => toast(String(e))); };
+    foot.append(clear);
+    menu.append(foot);
+  }
+
+  recentMenu = { items, index: 0 };
+  menu.hidden = false;
+  const anchor = $("btn-recent").getBoundingClientRect();
+  const x = Math.min(anchor.left, window.innerWidth - menu.offsetWidth - 12);
+  menu.style.left = `${Math.max(8, x)}px`;
+  menu.style.top = `${anchor.bottom + 6}px`;
+  $("btn-recent").setAttribute("aria-expanded", "true");
+  paintRecent();
+}
+
+function paintRecent() {
+  $("recent").querySelectorAll(".rc-item").forEach((el, n) => el.classList.toggle("sel", n === recentMenu?.index));
+}
+
+function closeRecent() {
+  recentMenu = null;
+  $("recent").hidden = true;
+  $("btn-recent").setAttribute("aria-expanded", "false");
+}
+
+function recentKey(e: KeyboardEvent): boolean {
+  if (!recentMenu) return false;
+  const n = recentMenu.items.length;
+  if (e.key === "Escape") { closeRecent(); $("btn-recent").focus(); return true; }
+  if (n === 0) return false;
+  if (e.key === "ArrowDown") { recentMenu.index = (recentMenu.index + 1) % n; paintRecent(); return true; }
+  if (e.key === "ArrowUp") { recentMenu.index = (recentMenu.index - 1 + n) % n; paintRecent(); return true; }
+  if (e.key === "Enter") { const path = recentMenu.items[recentMenu.index]; closeRecent(); void openPath(path); return true; }
+  return false;
+}
+
 // ---------------------------------------------------------------- documents
 
 function updateTitle() {
@@ -664,6 +740,7 @@ async function openPath(path: string) {
     const same = tabs.find((t) => t.path === d.path);
     if (same) { activate(same); return; }
     openDoc(d.path, d.content, d.mtime);
+    rememberRecent(d.path);
   } catch (e) {
     const msg = String(e);
     // A path that does not exist yet is a new document to be saved there.
@@ -708,6 +785,7 @@ async function saveAs(): Promise<boolean> {
   const path = /\.[^/\\]+$/.test(baseName(picked)) ? picked : `${picked}.md`;
   const was = t.path;
   const ok = await writeTo(t, path);
+  if (ok && path !== was) rememberRecent(path);
   // A tab in the background picks its new folder up when it is shown.
   if (ok && path !== was && t === doc) {
     preview.setDir(dirName(path));
@@ -859,6 +937,7 @@ async function checkDisk() {
 
 function onKey(e: KeyboardEvent) {
   if (quickFixKey(e)) { e.preventDefault(); return; }
+  if (recentKey(e)) { e.preventDefault(); return; }
   const mod = e.ctrlKey || e.metaKey;
   const k = e.key.toLowerCase();
   const stop = () => { e.preventDefault(); e.stopPropagation(); };
@@ -874,6 +953,7 @@ function onKey(e: KeyboardEvent) {
   if (mod && !e.shiftKey && k === "s") { stop(); void save(); return; }
   if (mod && e.shiftKey && k === "s") { stop(); void saveAs(); return; }
   if (mod && !e.shiftKey && k === "o") { stop(); void openWithDialog(); return; }
+  if (mod && e.shiftKey && k === "o") { stop(); void openRecent(); return; }
   if (mod && !e.shiftKey && k === "n") { stop(); newDoc(); return; }
   if (mod && !e.shiftKey && k === "w") { stop(); void closeTab(doc); return; }
   if (mod && e.key === "Tab") { stop(); cycleTab(e.shiftKey ? -1 : 1); return; }
@@ -966,12 +1046,14 @@ async function boot() {
   // chrome
   $("btn-new").innerHTML = icons.newFile;
   $("btn-open").innerHTML = icons.open;
+  $("btn-recent").innerHTML = icons.recent;
   $("btn-save").innerHTML = icons.save;
   $("btn-find").innerHTML = icons.search;
   $("btn-settings").innerHTML = icons.settings;
   $("btn-problems-close").innerHTML = icons.close;
   $("btn-new").onclick = newDoc;
   $("btn-open").onclick = () => void openWithDialog();
+  $("btn-recent").onclick = () => void openRecent();
   $("btn-save").onclick = () => void save();
   $("btn-settings").onclick = () => void settingsDialog.show();
   $("btn-theme").onclick = toggleTheme;
@@ -995,6 +1077,8 @@ async function boot() {
   window.addEventListener("blur", () => void autoSave.flushAll());
   document.addEventListener("mousedown", (e) => {
     if (qf && !(e.target as HTMLElement).closest("#quickfix")) closeQuickFix();
+    const t = e.target as HTMLElement;
+    if (recentMenu && !t.closest("#recent") && !t.closest("#btn-recent")) closeRecent();
   });
 
   applySettings(settings);
