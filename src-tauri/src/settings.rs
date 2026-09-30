@@ -143,6 +143,33 @@ pub fn save_ignored_to(dir: &Path, map: &BTreeMap<String, BTreeSet<String>>) -> 
     write_atomic(&dir.join("ignored.json"), text.as_bytes())
 }
 
+/// How many recently opened files to remember. Enough to span a work session
+/// without turning the menu into a list nobody reads to the bottom of.
+pub const RECENT_MAX: usize = 12;
+
+/// The files opened lately, most recent first. A short list of paths, so it is
+/// easy to read and edit by hand, like the rest of the config directory.
+pub fn recent_from(dir: &Path) -> Vec<String> {
+    std::fs::read_to_string(dir.join("recent.json"))
+        .ok()
+        .and_then(|t| serde_json::from_str::<Vec<String>>(&t).ok())
+        .unwrap_or_default()
+}
+
+pub fn save_recent_to(dir: &Path, recent: &[String]) -> Result<(), String> {
+    let text = serde_json::to_string_pretty(recent).map_err(|e| e.to_string())?;
+    write_atomic(&dir.join("recent.json"), text.as_bytes())
+}
+
+/// Move `path` to the front, dropping any earlier mention of it, and keep the
+/// list to `RECENT_MAX`. Reopening a file is what promotes it, so the menu
+/// stays in the order files were last touched.
+pub fn push_recent(recent: &mut Vec<String>, path: String) {
+    recent.retain(|p| p != &path);
+    recent.insert(0, path);
+    recent.truncate(RECENT_MAX);
+}
+
 /// Write to a sibling temporary file and rename it over the target.
 ///
 /// The target is resolved through symlinks first: renaming over a symlink
@@ -222,6 +249,39 @@ mod tests {
         assert_eq!(words_from(&d), vec!["alpha", "beta", "zeta"]);
         save_words_to(&d, &words_from(&d)).unwrap();
         assert_eq!(words_from(&d), vec!["alpha", "beta", "zeta"]);
+    }
+
+    #[test]
+    fn recent_promotes_dedups_and_caps() {
+        let mut r: Vec<String> = Vec::new();
+        for i in 0..RECENT_MAX + 5 {
+            push_recent(&mut r, format!("/f{i}.md"));
+        }
+        assert_eq!(r.len(), RECENT_MAX);
+        assert_eq!(r[0], format!("/f{}.md", RECENT_MAX + 4));
+        // Reopening an existing file moves it to the front, once.
+        push_recent(&mut r, "/f10.md".into());
+        assert_eq!(r[0], "/f10.md");
+        assert_eq!(r.iter().filter(|p| *p == "/f10.md").count(), 1);
+        assert_eq!(r.len(), RECENT_MAX);
+    }
+
+    #[test]
+    fn recent_survives_a_round_trip() {
+        let d = scratch("recent");
+        let mut r = Vec::new();
+        push_recent(&mut r, "/a.md".into());
+        push_recent(&mut r, "/b.md".into());
+        save_recent_to(&d, &r).unwrap();
+        assert_eq!(recent_from(&d), vec!["/b.md", "/a.md"]);
+    }
+
+    #[test]
+    fn recent_of_a_missing_or_bad_file_is_empty() {
+        let d = scratch("recent-bad");
+        assert!(recent_from(&d).is_empty());
+        std::fs::write(d.join("recent.json"), "{ not a list").unwrap();
+        assert!(recent_from(&d).is_empty());
     }
 
     #[cfg(unix)]

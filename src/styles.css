@@ -302,6 +302,23 @@ button:disabled { opacity: 0.45; cursor: default; }
 .qf-item.sel { background: var(--accent); color: #fff; }
 .qf-item.sel kbd { color: #ffffffb0; }
 
+/* ---------------------------------------------------------------- recent files */
+
+#recent {
+  position: fixed; z-index: 40; min-width: 280px; max-width: 460px; padding: 5px;
+  background: var(--bg-raised); border: 1px solid var(--border); border-radius: 9px; box-shadow: var(--shadow);
+}
+.rc-head { padding: 6px 9px 8px; color: var(--muted); font-size: 12px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.rc-item { display: block; width: 100%; text-align: left; padding: 5px 8px; overflow: hidden; }
+.rc-name { display: block; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-dir { display: block; color: var(--faint); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.rc-item.sel { background: var(--accent); }
+.rc-item.sel .rc-name, .rc-item.sel .rc-dir { color: #fff; }
+.rc-item.sel .rc-dir { color: #ffffffcc; }
+.rc-empty { padding: 8px 9px; color: var(--muted); font-size: 12.5px; }
+.rc-foot { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
+.rc-foot button { width: 100%; text-align: left; padding: 5px 8px; color: var(--muted); font-size: 12.5px; }
+
 /* ---------------------------------------------------------------- status bar */
 
 #statusbar {
