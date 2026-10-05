@@ -762,8 +762,18 @@ async function openWithDialog() {
   if (picked) await openPaths(Array.isArray(picked) ? picked : [picked]);
 }
 
+const UNTITLED_HINT = "This Untitled tab is already a new file. Start typing, then press Ctrl+S to save it.";
+
+/** New on an empty Untitled tab reuses it, so say so rather than seem to do nothing. */
+function pointAtUntitled() {
+  const on = $("tabs").querySelector<HTMLElement>(".tab.on");
+  if (on) { on.classList.remove("flash"); void on.offsetWidth; on.classList.add("flash"); }
+  const showing = [...$("toasts").children].some((el) => el.textContent === UNTITLED_HINT && !el.classList.contains("out"));
+  if (!showing) toast(UNTITLED_HINT, 4000);
+}
+
 function newDoc() {
-  if (pristine(doc)) { editor.view.focus(); return; }
+  if (pristine(doc)) { pointAtUntitled(); editor.view.focus(); return; }
   addTab("");
   preview.pane.scrollTop = 0;
   showDoc();
