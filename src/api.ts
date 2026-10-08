@@ -46,6 +46,13 @@ export interface Settings {
   dialect: string;
   autoSave: boolean;
   rules: Record<string, boolean>;
+  /** A piper voice's path, `system:<name>` for a webview voice, or "" for automatic. */
+  speechVoice: string;
+  /** Read-aloud speed as a playback rate; 1 is the voice's own pace. */
+  speechRate: number;
+  speechSkipCode: boolean;
+  /** The piper program; "" means look in the usual places. */
+  speechPiper: string;
   // Keys a newer build wrote ride along untouched.
   [extra: string]: unknown;
 }
@@ -59,6 +66,29 @@ export interface Doc {
 export interface Launch {
   paths: string[];
   view: View | null;
+}
+
+export interface Voice {
+  /** The model's file name without `.onnx`, e.g. `en_US-ryan-high`. */
+  name: string;
+  path: string;
+}
+
+export interface SpeechInfo {
+  piper: string | null;
+  voices: Voice[];
+}
+
+export interface RulesFile {
+  path: string;
+  text: string;
+}
+
+/** Where a document was left, by sentence index and that sentence's text. */
+export interface Place {
+  path: string;
+  sentence: number;
+  text: string;
 }
 
 export interface About {
@@ -86,6 +116,12 @@ export const api = {
   recentAdd: (path: string) => invoke<string[]>("recent_add", { path }),
   recentClear: () => invoke<void>("recent_clear"),
   about: () => invoke<About>("about"),
+  speechInfo: () => invoke<SpeechInfo>("speech_info"),
+  /** One sentence as WAV bytes. */
+  speechSay: (text: string, voice: string) => invoke<ArrayBuffer>("speech_say", { text, voice }),
+  speechRules: (path: string) => invoke<RulesFile | null>("speech_rules", { path }),
+  placeGet: (path: string) => invoke<Place | null>("speech_place_get", { path }),
+  placeSet: (place: Place) => invoke<void>("speech_place_set", { place }),
 };
 
 export const DIALECTS = ["American", "British", "Canadian", "Australian", "Indian"];

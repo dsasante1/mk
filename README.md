@@ -65,6 +65,37 @@ You can reach these actions by hovering an underline, pressing Ctrl+. on it, or 
 
 **Auto save.** Turn on "Save automatically" in Settings and mk saves each file about a second after you stop typing. It also saves when you switch tabs or leave the window, and it saves files as you close them instead of asking. Auto save is off by default. Untitled documents still need Ctrl+S the first time, because mk will not choose a name for you. If another program changes a file while you have unsaved edits, auto save stops for that file and the usual reload question decides. If a save fails, mk tells you once and tries again after your next edit.
 
+**Read aloud.** The speaker button in the top bar (or Ctrl+Shift+Space) reads the document to you, starting from the first sentence on screen. In the editor-only view it starts at the cursor. The sentence being read is highlighted in the preview, and its lines are marked in the editor; the preview scrolls to keep it in view. A bar at the bottom of the window has play and pause, previous and next sentence, stop, the speed, and a switch between reading to the end and stopping at the end of the current section. Alt+click a sentence in the preview to read from there. Alt+[ and Alt+] step back and on while reading, and Esc stops. You can keep typing while it reads: the highlight follows your edits. mk remembers where you stopped in each file and carries on from there the next time you press play. Code blocks are skipped unless you turn that off in Settings.
+
+The voice is [piper](https://github.com/rhasspy/piper) if it is installed, which sounds natural and runs entirely on your machine. mk finds piper and its voices on `PATH`, in the [Pied](https://pied.mikeasoft.com) app's folder, in `~/.local/share/piper`, `~/.local/share/piper-voices` and `/usr/share/piper-voices`, and in `voices/` in mk's settings folder. You can also give the program's path in Settings. Choose the voice in Settings, under Read aloud, where "Hear the voice" plays a sample. Medium-quality voices start speaking sooner than high-quality ones, so "Automatic" prefers them. Without piper, mk uses your system's voices through the webview. On macOS and Windows these sound good; on Linux WebKitGTK only has Flite's, which sound robotic.
+
+**Speech rules.** Text written to be read is not always text that sounds right. mk already drops URLs and reads "e.g.", arrows and currency properly. For anything particular to your documents, put a `.mk-speech.json` beside them, or in any folder above them; mk uses the nearest one. For example:
+
+```json
+{
+  "skip": { "sections": ["Links"], "startingWith": ["Sources:"], "code": true },
+  "abbreviations": ["v", "No", "Ltd"],
+  "words": { "SSNIT": "snit", "Ltd": "Limited" },
+  "spell": { "acronyms": true, "except": ["ECOWAS"] },
+  "replace": [
+    { "find": "\\bAct (\\d{3,4})\\b", "with": "Act ${digits:1}", "note": "Act 992 → Act 9 9 2" },
+    { "find": "^0(\\d)\\. ", "with": "Topic $1. ", "in": "headings" }
+  ]
+}
+```
+
+| Key | What it does |
+| --- | --- |
+| `skip.sections` | Headings whose sections are not read, up to the next heading of the same or a higher level |
+| `skip.startingWith` | A paragraph or list item that starts with one of these is not read |
+| `skip.code` | Overrides the Settings choice about code blocks |
+| `abbreviations` | Words whose full stop does not end a sentence. Common ones (Mr, Dr, e.g., No, …) are built in |
+| `words` | Whole words to say differently: names the voice gets wrong, abbreviations to expand |
+| `spell.acronyms` | Spell out words in capitals ("SEC" as "S E C"), except those in `except` and Roman numerals. Lines set entirely in capitals are left alone |
+| `replace` | Regular expressions, applied in order to each sentence. `with` takes `$1`, `$&` and `${name:N}`, which transforms group N: `digits` ("992" as "9 9 2"), `letters` ("L.I." as "L I"), `upper`, `lower`, `roman` ("iv" as 4) and `sub` (a subsection: "a" as "A", "ii" as 2). `repeat` applies a rule until nothing changes, `in` limits it to `headings` or `text`, and `note` is for you |
+
+The file holds regular expressions and word lists, never code, so a folder someone else wrote can change how its text is read but nothing more. A rule with a mistake in it is reported when reading starts, and the others still apply.
+
 ## Privacy and untrusted files
 
 Grammar checking runs entirely on your machine. The one thing that goes over the network is a remote image: when a document contains `![](https://…)`, the preview fetches it, as a browser or GitHub would. That means opening a Markdown file someone else wrote can tell the server hosting its images that the file was opened, and from what IP address. Read untrusted documents in the editor-only view (Ctrl+1) if that matters to you.
@@ -91,6 +122,10 @@ Everything else about an untrusted document is contained. Raw HTML in the previe
 | Ctrl+Shift+F | Find and replace in the editor |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Font size |
 | F7 | Toggle light and dark |
+| Ctrl+Shift+Space | Read aloud from where you are; pause; resume |
+| Alt+[ / Alt+] | Previous / next sentence while reading |
+| Alt+click in the preview | Read aloud from that sentence |
+| Esc | Stop reading (once nothing else is open) |
 | Ctrl+, | Settings |
 | Ctrl+Q | Quit (asks if there are unsaved changes) |
 
@@ -103,6 +138,8 @@ Settings live in `~/.config/mk/` (or `$XDG_CONFIG_HOME/mk/`) on Linux and macOS,
 - `settings.json` holds the theme, view, font, wrapping, auto save, dialect (American, British, Canadian, Australian, Indian) and per-rule overrides. Rules you have not touched follow Harper's defaults, so rules added in a newer Harper arrive switched on. A malformed file never stops mk from starting. A field with the wrong type falls back to its default on its own, and keys mk does not recognise are kept when it saves.
 - `dictionary.txt` is your personal dictionary, one word per line. You can edit it by hand.
 - `ignored.json` holds the issues you ignored, by file.
+- `speech-places.json` holds where you stopped reading aloud in each file, for the last 200 files.
+- `voices/` is one place mk looks for piper voices (a `.onnx` model with its `.onnx.json` beside it).
 
 ## Building
 
@@ -133,15 +170,19 @@ cargo test --manifest-path src-tauri/Cargo.toml    # Harper bridge, settings, CL
 | --- | --- |
 | `src-tauri/src/grammar.rs` | Harper on its own thread. It keeps one `LintGroup` for the app's lifetime, so Harper's per-sentence cache works, and it answers only the newest request. It also converts Harper's `char` offsets to the UTF-16 offsets JavaScript uses. |
 | `src-tauri/src/settings.rs` | Tolerant settings, the dictionary, ignored issues, and atomic writes. |
+| `src-tauri/src/speech.rs` | Read aloud: finding piper and its voices, synthesising one sentence to WAV, finding the rules file, and remembering places. |
 | `src-tauri/src/main.rs` | File I/O, the command line, and the Tauri commands. |
 | `src/grammar.ts` | When to lint and how to show the results. Edits made while a lint is running are mapped onto its results, so underlines never land on the wrong words. |
 | `src/editor.ts` | CodeMirror setup and the formatting commands. |
 | `src/markdown.ts`, `src/preview.ts` | Rendering with source-line anchors, sanitising, images, links and scroll sync. |
 | `src/section-nav.ts` | The section rail: which heading you are under, and jumping between them. |
+| `src/reader.ts` | Read aloud: the sentences of the rendered page and their highlights, where to start, the player bar. |
+| `src/speech-text.ts`, `src/speech-rules.ts` | Splitting text into sentences, and the speech rules file with the built-in clean-up. |
+| `src/speech-engine.ts` | The two voices: piper, played through an `<audio>` element one sentence ahead, and the webview's own speech. |
 | `src/main.ts` | The app shell. |
 
 ## Credits and licence
 
 mk is released under the [MIT licence](LICENSE).
 
-Grammar checking is [Harper](https://github.com/automattic/harper) by Automattic, licensed under Apache-2.0. mk also builds on [Tauri](https://tauri.app), [CodeMirror](https://codemirror.net), [markdown-it](https://github.com/markdown-it/markdown-it), [DOMPurify](https://github.com/cure53/DOMPurify) and [highlight.js](https://highlightjs.org), each under its own permissive licence.
+Grammar checking is [Harper](https://github.com/automattic/harper) by Automattic, licensed under Apache-2.0. Read aloud uses [piper](https://github.com/rhasspy/piper) when it is installed; it is not bundled with mk. mk also builds on [Tauri](https://tauri.app), [CodeMirror](https://codemirror.net), [markdown-it](https://github.com/markdown-it/markdown-it), [DOMPurify](https://github.com/cure53/DOMPurify) and [highlight.js](https://highlightjs.org), each under its own permissive licence.

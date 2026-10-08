@@ -40,6 +40,15 @@ pub struct Settings {
     pub auto_save: bool,
     /// Harper rule overrides by rule name; absent means Harper's default.
     pub rules: BTreeMap<String, bool>,
+    /// Read aloud: a piper voice model's path, `system:<name>` for one of the
+    /// webview's own voices, or empty to choose automatically.
+    pub speech_voice: String,
+    /// Read-aloud speed, as a playback rate: 1 is the voice's own pace.
+    pub speech_rate: f64,
+    /// Leave fenced code blocks out when reading aloud.
+    pub speech_skip_code: bool,
+    /// The piper program. Empty means look in the usual places.
+    pub speech_piper: String,
     /// Keys a newer build wrote. Kept so a save cannot drop them.
     #[serde(flatten)]
     pub extra: Map<String, Value>,
@@ -62,6 +71,10 @@ impl Default for Settings {
             dialect: "American".into(),
             auto_save: false,
             rules: BTreeMap::new(),
+            speech_voice: String::new(),
+            speech_rate: 1.0,
+            speech_skip_code: true,
+            speech_piper: String::new(),
             extra: Map::new(),
         }
     }

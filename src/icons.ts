@@ -15,4 +15,10 @@ export const icons = {
   up: svg(`<path d="M6 15l6-6 6 6"/>`),
   down: svg(`<path d="M6 9l6 6 6-6"/>`),
   close: svg(`<path d="M6 6l12 12M18 6L6 18"/>`),
+  speaker: svg(`<path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.4 5.6a9 9 0 0 1 0 12.8"/>`),
+  play: svg(`<path d="M7 4.5v15l12-7.5z"/>`),
+  pause: svg(`<path d="M8 5v14M16 5v14"/>`),
+  stop: svg(`<rect x="6" y="6" width="12" height="12" rx="1.5"/>`),
+  prev: svg(`<path d="M18 6l-8 6 8 6z"/><path d="M6 6v12"/>`),
+  next: svg(`<path d="M6 6l8 6-8 6z"/><path d="M18 6v12"/>`),
 };

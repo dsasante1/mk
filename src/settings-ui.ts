@@ -4,10 +4,11 @@
 
 import DOMPurify from "dompurify";
 import markdownit from "markdown-it";
-import { api, DIALECTS, type Rule, type Settings } from "./api";
+import { api, DIALECTS, type Rule, type Settings, type SpeechInfo } from "./api";
 import { ruleLabel } from "./grammar";
 
 const inline = markdownit({ html: false, linkify: false });
+const SPEEDS = [0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string> = {}, ...kids: (Node | string)[]) {
   const el = document.createElement(tag);
@@ -23,11 +24,20 @@ export interface SettingsHooks {
   relint(): void;
   ignoredCount(): number;
   clearIgnored(): void;
+  speech: {
+    /** The voices to offer, as select options. */
+    choices(): Promise<{ value: string; label: string }[]>;
+    info(): Promise<SpeechInfo>;
+    /** Say a line in the chosen voice. */
+    sample(): void;
+  };
 }
 
 export class SettingsDialog {
   private rules: Rule[] = [];
   private words: string[] = [];
+  private voices: { value: string; label: string }[] = [];
+  private speechInfo: SpeechInfo = { piper: null, voices: [] };
   private filter = "";
 
   constructor(private dlg: HTMLDialogElement, private hooks: SettingsHooks) {
@@ -37,7 +47,9 @@ export class SettingsDialog {
   get open() { return this.dlg.open; }
 
   async show() {
-    [this.rules, this.words] = await Promise.all([api.rules(), api.words()]);
+    [this.rules, this.words, this.voices, this.speechInfo] = await Promise.all([
+      api.rules(), api.words(), this.hooks.speech.choices(), this.hooks.speech.info(),
+    ]);
     this.build();
     if (!this.dlg.open) this.dlg.showModal();
   }
@@ -75,6 +87,24 @@ export class SettingsDialog {
     body.append(h("h3", {}, "Saving"));
     body.append(this.toggle("Save automatically a second after you stop typing", s.autoSave, (v) => this.set({ autoSave: v })));
     body.append(h("p", { class: "hint" }, "Untitled documents still wait for Ctrl+S. A file changed by another program is never overwritten without asking."));
+
+    // ---- read aloud ----
+    body.append(h("h3", {}, "Read aloud"));
+    const voices = this.voices.some((v) => v.value === s.speechVoice)
+      ? this.voices
+      : [...this.voices, { value: s.speechVoice, label: "Chosen voice (not found)" }];
+    body.append(this.select("Voice", s.speechVoice, voices.map((v) => [v.value, v.label]), (v) => this.set({ speechVoice: v })));
+    body.append(this.select("Speed", String(s.speechRate || 1), SPEEDS.map((r) => [String(r), `${r}×`]), (v) => this.set({ speechRate: Number(v) })));
+    body.append(this.toggle("Skip code blocks", s.speechSkipCode, (v) => this.set({ speechSkipCode: v })));
+    body.append(this.text("piper program", s.speechPiper, this.speechInfo.piper ? `Found: ${this.speechInfo.piper}` : "Not found; give its path", (v) => this.set({ speechPiper: v.trim() })));
+    const hear = h("button", {}, "Hear the voice");
+    hear.onclick = () => this.hooks.speech.sample();
+    body.append(h("div", { class: "row" }, hear));
+    body.append(h("p", { class: "hint" },
+      this.speechInfo.piper
+        ? `${this.speechInfo.voices.length} piper voice${this.speechInfo.voices.length === 1 ? "" : "s"} found. Ctrl+Shift+Space reads from where you are; Alt+click a sentence in the preview to read from there. `
+        : "piper gives natural voices; without it mk uses the system's. Install piper and a voice, or give the path above. ",
+      "A ", h("code", {}, ".mk-speech.json"), " file beside your documents, or in a folder above them, sets how their text is read: words to say differently, sections to skip, and patterns to rewrite."));
 
     // ---- grammar ----
     body.append(h("h3", {}, "Harper"));
