@@ -9,6 +9,7 @@
 
 mod grammar;
 mod settings;
+mod speech;
 
 use grammar::{Config, Grammar, Issue, Rule};
 use serde::Serialize;
@@ -32,6 +33,7 @@ struct AppState {
     words: Mutex<Vec<String>>,
     ignored: Mutex<BTreeMap<String, BTreeSet<String>>>,
     recent: Mutex<Vec<String>>,
+    places: Mutex<Vec<speech::Place>>,
 }
 
 fn config_of(s: &Settings, words: &[String]) -> Config {
@@ -272,6 +274,45 @@ fn recent_clear(state: State<'_, AppState>) -> Result<(), String> {
     settings::save_recent_to(&state.dir, &r)
 }
 
+// ---------------------------------------------------------------- read aloud
+
+#[tauri::command]
+fn speech_info(state: State<'_, AppState>) -> speech::Info {
+    let piper = state.settings.lock().unwrap().speech_piper.clone();
+    speech::info(&piper, &state.dir)
+}
+
+/// One sentence as WAV bytes, sent as raw binary rather than JSON: a sentence
+/// of speech is a few hundred kilobytes, and the webview plays it as a blob.
+#[tauri::command]
+async fn speech_say(state: State<'_, AppState>, text: String, voice: String) -> Result<tauri::ipc::Response, String> {
+    let setting = state.settings.lock().unwrap().speech_piper.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let piper = speech::find_piper(&setting).ok_or_else(|| "piper is not installed".to_string())?;
+        speech::synthesize(&piper, Path::new(&voice), &text)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map(tauri::ipc::Response::new)
+}
+
+#[tauri::command]
+fn speech_rules(path: String) -> Option<speech::RulesFile> {
+    speech::find_rules(Path::new(&path))
+}
+
+#[tauri::command]
+fn speech_place_get(state: State<'_, AppState>, path: String) -> Option<speech::Place> {
+    state.places.lock().unwrap().iter().find(|p| p.path == path).cloned()
+}
+
+#[tauri::command]
+fn speech_place_set(state: State<'_, AppState>, place: speech::Place) -> Result<(), String> {
+    let mut p = state.places.lock().unwrap();
+    speech::push_place(&mut p, place);
+    speech::save_places_to(&state.dir, &p)
+}
+
 #[derive(Serialize)]
 struct About {
     version: &'static str,
@@ -296,6 +337,7 @@ fn main() {
         grammar: Grammar::start(config_of(&s, &words)),
         ignored: Mutex::new(settings::ignored_from(&dir)),
         recent: Mutex::new(settings::recent_from(&dir)),
+        places: Mutex::new(speech::places_from(&dir)),
         settings: Mutex::new(s),
         words: Mutex::new(words),
         dir,
@@ -309,7 +351,8 @@ fn main() {
             launch, read_file, write_file, file_mtime, lint, grammar_rules,
             settings_get, settings_set, words_get, word_add, word_remove,
             ignored_get, ignore_add, ignore_clear, recent_get, recent_add,
-            recent_clear, about,
+            recent_clear, about, speech_info, speech_say, speech_rules,
+            speech_place_get, speech_place_set,
         ])
         .run(tauri::generate_context!())
         .expect("error while running mk");

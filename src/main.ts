@@ -23,6 +23,7 @@ import { FindBar, findHighlight } from "./find";
 import { Grammar, groupOf, GROUP_LABEL, ruleLabel, type Group } from "./grammar";
 import { headings } from "./markdown";
 import { Preview } from "./preview";
+import { Reader, speakingLines, voiceChoices } from "./reader";
 import { SectionNav } from "./section-nav";
 import { SettingsDialog } from "./settings-ui";
 import { icons } from "./icons";
@@ -111,9 +112,12 @@ function saveSettingsSoon() {
   saveTimer = window.setTimeout(saveSettings, 400);
 }
 
+const speechKey = (s: Settings | undefined) => s ? `${s.speechVoice}|${s.speechRate}|${s.speechPiper}` : "";
+
 function applySettings(next: Settings) {
   const grammarWas = settings?.grammar;
   const autoSaveWas = settings?.autoSave;
+  const speechWas = speechKey(settings);
   settings = next;
   applyTheme();
   editor?.apply(settings);
@@ -123,6 +127,7 @@ function applySettings(next: Settings) {
   sectionNav.setEnabled(settings.sectionNav);
   // Switched on with edits outstanding: those are saved too, not only the next.
   if (settings.autoSave && autoSaveWas === false) for (const t of tabs) autoSave.schedule(t);
+  if (reader && speechWas && speechWas !== speechKey(settings)) void reader.settingsChanged();
   updateStatus();
 }
 
@@ -130,6 +135,7 @@ function applySettings(next: Settings) {
 
 let editor: Editor;
 let grammar: Grammar;
+let reader: Reader;
 let previewTimer: number | undefined;
 
 const preview = new Preview($("preview"), $("preview-pane"), {
@@ -213,6 +219,7 @@ function refresh() {
   renderPreview();
   sectionNav.set(headings(editor.text()));
   findBar.refresh();
+  reader.refresh();
 }
 
 function onUpdate(u: ViewUpdate) {
@@ -284,6 +291,7 @@ function setView(v: View, persist = true) {
   if (v !== "edit") renderPreview();
   if (v !== "preview") editor?.view.requestMeasure();
   if (editor) findBar.refresh();
+  reader?.refresh();
   sectionNav.schedule();
   if (persist) saveSettingsSoon();
 }
@@ -650,6 +658,8 @@ function stash() {
 
 /** Show `doc` in the shared editor, preview and Harper. */
 function showDoc() {
+  // Reading belongs to a document; another one in the window ends it.
+  reader?.stop();
   preview.setDir(doc.path ? dirName(doc.path) : null);
   hideBanner();
   updateTitle();
@@ -957,8 +967,15 @@ function onKey(e: KeyboardEvent) {
     // never how you quit, and never how you lose work.
     if (settingsDialog.open) return;
     if (findBar.isOpen) { findBar.close(); stop(); return; }
-    if (!$("banner").hidden) { hideBanner(); stop(); }
+    if (!$("banner").hidden) { hideBanner(); stop(); return; }
+    if (reader.active) { reader.stop(); stop(); }
     return;
+  }
+  // Read aloud. Space alone is for typing, and [ ] are characters, so the
+  // keys carry modifiers; the sentence keys only act while reading.
+  if (mod && e.shiftKey && e.code === "Space") { stop(); void reader.toggle(); return; }
+  if (e.altKey && !mod && reader.active && (e.code === "BracketLeft" || e.code === "BracketRight")) {
+    stop(); void reader.step(e.code === "BracketLeft" ? -1 : 1); return;
   }
   if (mod && !e.shiftKey && k === "s") { stop(); void save(); return; }
   if (mod && e.shiftKey && k === "s") { stop(); void saveAs(); return; }
@@ -1022,7 +1039,7 @@ async function boot() {
   home = await homeDir().then((h) => h.replace(/\/$/, "")).catch(() => null);
   applyTheme();
 
-  editor = new Editor($("editor-pane"), settings, [findHighlight], {
+  editor = new Editor($("editor-pane"), settings, [findHighlight, speakingLines], {
     onUpdate,
     keys: [],
   });
@@ -1042,6 +1059,23 @@ async function boot() {
   });
   grammar.enabled = settings.grammar;
 
+  reader = new Reader($("reader"), {
+    settings: () => settings,
+    setRate(rate) { settings.speechRate = rate; saveSettingsSoon(); },
+    path: () => doc.path,
+    preview: () => (settings.view !== "edit" ? preview.el : null),
+    pane: () => preview.pane,
+    source: () => editor.text(),
+    editor: () => editor.view,
+    editorShown: () => settings.view !== "preview",
+    toast,
+    changed() {
+      const b = $("btn-read");
+      b.classList.toggle("on", reader.active);
+      b.dataset.tip = reader.state === "playing" ? "Pause reading (Ctrl+Shift+Space)" : reader.state === "paused" ? "Resume reading (Ctrl+Shift+Space)" : "Read aloud (Ctrl+Shift+Space)";
+    },
+  });
+
   settingsDialog = new SettingsDialog($("settings") as HTMLDialogElement, {
     current: () => settings,
     onChange(s) {
@@ -1051,6 +1085,11 @@ async function boot() {
     relint() { void savingSettings.then(() => grammar.schedule(0)); },
     ignoredCount: () => grammar.ignoredCount,
     clearIgnored: () => void grammar.clearIgnored(),
+    speech: {
+      choices: () => voiceChoices(reader),
+      info: () => reader.speechInfo(),
+      sample: () => void reader.sample(),
+    },
   });
 
   // chrome
@@ -1059,6 +1098,7 @@ async function boot() {
   $("btn-recent").innerHTML = icons.recent;
   $("btn-save").innerHTML = icons.save;
   $("btn-find").innerHTML = icons.search;
+  $("btn-read").innerHTML = icons.speaker;
   $("btn-settings").innerHTML = icons.settings;
   $("btn-problems-close").innerHTML = icons.close;
   $("btn-new").onclick = newDoc;
@@ -1071,6 +1111,15 @@ async function boot() {
     if (findBar.isOpen) findBar.close();
     else { closeSearchPanel(editor.view); findBar.open(); }
   };
+  $("btn-read").onclick = () => void reader.toggle();
+  // Alt+click a sentence in the preview to read from there. Caught on the way
+  // down, so an Alt+click on a link reads it instead of following it.
+  preview.el.addEventListener("click", (e) => {
+    if (!e.altKey) return;
+    e.preventDefault();
+    e.stopPropagation();
+    void reader.startAtPoint(e.clientX, e.clientY);
+  }, true);
   $("btn-problems").onclick = () => setProblems(!settings.problemsOpen);
   $("btn-problems-close").onclick = () => setProblems(false);
   $("st-harper").onclick = () => setProblems(!settings.problemsOpen);
@@ -1102,6 +1151,7 @@ async function boot() {
 
   // Every tab with unsaved work is asked about, in turn; one Cancel keeps the window.
   await win.onCloseRequested(async (e) => {
+    reader.stop();
     closing = true;
     try {
       await Promise.all(tabs.map((t) => autoSave.flush(t)));
