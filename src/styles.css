@@ -457,6 +457,8 @@ dialog#settings h2 { margin: 0; font-size: 16px; }
 :root[data-theme="dark"] { --speech: #c9a22766; --speech-line: #c9a22722; }
 
 ::highlight(mk-speech) { background-color: var(--speech); color: inherit; }
+/* Toggled as the reading moves on, only to make WebKitGTK repaint the preview. */
+.speech-repaint { background-color: rgb(127 127 127 / 0.004); }
 .cm-speaking { background-color: var(--speech-line); box-shadow: inset 3px 0 0 var(--speech); }
 #btn-read.on { color: var(--accent); background: var(--accent-soft); }
 

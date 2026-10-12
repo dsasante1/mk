@@ -194,6 +194,8 @@ export class Reader {
   private warnedFallback = false;
   /** Playing the Settings sample: nothing to highlight, and no place to save. */
   private sampling = false;
+  /** The highlight of the sentence being read, made once and reused. */
+  private mark: Highlight | null = null;
   private els!: { play: HTMLButtonElement; status: HTMLElement; speed: HTMLSelectElement; scope: HTMLButtonElement };
 
   constructor(private bar: HTMLElement, private hooks: ReaderHooks) {
@@ -323,8 +325,9 @@ export class Reader {
     if (this.sampling) return;
     if (i >= this.stopAt) { this.engine?.stop(); this.save(); this.end(); return; }
     this.waiting = false;
-    this.index = i;
+    // Highlighted before the index moves: highlight() steps the page's place on by the difference.
     this.highlight(i);
+    this.index = i;
     if (Date.now() - this.savedAt > 15_000) this.save();
   }
 
@@ -344,7 +347,8 @@ export class Reader {
   private end() {
     this.state = "idle";
     this.waiting = false;
-    if (typeof CSS !== "undefined" && "highlights" in CSS) CSS.highlights.delete("mk-speech");
+    this.mark?.clear();
+    this.repaint();
     this.hooks.editor().dispatch({ effects: setSpeaking.of(null) });
     this.bar.hidden = true;
     this.hooks.changed();
@@ -453,11 +457,23 @@ export class Reader {
     this.liveIndex = relocate(this.live.map((x) => x.text), Math.min(this.liveIndex + (i - this.index), this.live.length - 1), s.text);
     const at = this.live[this.liveIndex] ?? s;
     if (at.range && typeof CSS !== "undefined" && "highlights" in CSS) {
-      CSS.highlights.set("mk-speech", new Highlight(at.range));
+      if (!this.mark) CSS.highlights.set("mk-speech", (this.mark = new Highlight()));
+      this.mark.clear();
+      this.mark.add(at.range);
+      this.repaint();
       this.keepInView(at.range);
     }
     this.markEditor(at.line);
     this.paint(i);
+  }
+
+  /**
+   * WebKitGTK paints the new sentence but does not always repaint where the
+   * old one was, leaving a trail of highlighted sentences behind the voice.
+   * Flipping an all but invisible background on the preview repaints it whole.
+   */
+  private repaint() {
+    this.hooks.preview()?.classList.toggle("speech-repaint");
   }
 
   /** Scroll the preview only when the sentence is out of view, as a reader's eye would. */
