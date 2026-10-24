@@ -85,9 +85,12 @@ body.dragging { cursor: col-resize; user-select: none; }
 [hidden] { display: none !important; }
 
 /* Named areas, so a hidden banner leaves an empty row instead of shifting
-   the workspace and status bar up a row each. */
+   the workspace and status bar up a row each. The column is minmax(0, 1fr),
+   not auto: an auto track grows to the widest row's minimum content, and the
+   top bar's file name would push the whole shell past the window's edge. */
 #app {
-  display: grid; grid-template-rows: 44px auto auto 1fr 26px; height: 100vh;
+  display: grid; grid-template-rows: 44px auto auto 1fr 26px; grid-template-columns: minmax(0, 1fr);
+  height: 100vh; width: 100%;
   grid-template-areas: "top" "tabs" "banner" "work" "status";
 }
 #topbar { grid-area: top; }
@@ -102,11 +105,12 @@ body.dragging { cursor: col-resize; user-select: none; }
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 0 10px; background: var(--chrome); border-bottom: 1px solid var(--border);
 }
-#topbar .group { display: flex; align-items: center; gap: 4px; }
+#topbar .group { flex: none; display: flex; align-items: center; gap: 4px; }
 #docname { flex: 1; min-width: 0; display: flex; align-items: baseline; justify-content: center; gap: 6px; white-space: nowrap; overflow: hidden; }
-#doc-title { font-weight: 600; color: var(--heading); }
-#doc-dirty { color: var(--accent); font-size: 11px; }
-#doc-dir { color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; direction: rtl; }
+/* Both shrink with the window, the directory first; neither clips mid-glyph. */
+#doc-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--heading); }
+#doc-dirty { flex: none; color: var(--accent); font-size: 11px; }
+#doc-dir { flex: 0 6 auto; min-width: 0; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; direction: rtl; }
 
 button { background: none; border: 1px solid transparent; border-radius: 6px; padding: 4px 9px; cursor: pointer; }
 button:hover { background: var(--hover); }
@@ -178,10 +182,10 @@ button:disabled { opacity: 0.45; cursor: default; }
 /* ---------------------------------------------------------------- workspace */
 
 #workspace { display: flex; min-height: 0; overflow: hidden; }
-#workspace.with-problems { --problems-w: 340px; }
+#workspace.with-problems { --problems-w: min(340px, 38%); }
 #editor-pane, #preview-pane { min-width: 0; min-height: 0; height: 100%; }
 #editor-pane { flex: 0 0 calc((100% - var(--problems-w)) * var(--ratio) - 3px); background: var(--bg); }
-#preview-pane { flex: 1 1 0; overflow-y: auto; background: var(--bg); }
+#preview-pane { flex: 1 1 0; overflow-y: auto; background: var(--bg); container-type: inline-size; }
 #divider { flex: 0 0 6px; cursor: col-resize; background: var(--bg); border-left: 1px solid var(--border); transition: background 0.15s; }
 #divider:hover { background: var(--accent-soft); }
 
@@ -211,7 +215,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 
 .sn-menu {
   position: absolute; right: 100%; top: 50%; transform: translate(6px, -50%);
-  width: 250px; max-height: 70vh; overflow-y: auto; padding: 5px;
+  width: min(250px, calc(100vw - 90px)); max-height: 70vh; overflow-y: auto; padding: 5px;
   background: var(--bg-raised); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
   opacity: 0; pointer-events: none; transition: opacity 0.12s, transform 0.12s;
 }
@@ -256,7 +260,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 .cm-lintRange.hp-style { text-decoration-color: var(--hp-style); text-decoration-style: dotted; text-decoration-thickness: 2px; }
 .cm-lintRange-active.hp-mark { background-color: var(--accent-soft); }
 
-.cm-tooltip.cm-tooltip-lint { box-shadow: var(--shadow); padding: 4px; max-width: 460px; font-family: var(--sans); font-size: 13px; }
+.cm-tooltip.cm-tooltip-lint { box-shadow: var(--shadow); padding: 4px; max-width: min(460px, calc(100vw - 24px)); font-family: var(--sans); font-size: 13px; }
 .cm-tooltip-lint .cm-diagnostic { border-left: 3px solid var(--faint); padding: 8px 10px 8px 12px; margin: 0; }
 .cm-tooltip-lint .cm-diagnostic-error { border-left-color: var(--hp-spelling); }
 .cm-tooltip-lint .cm-diagnostic-warning { border-left-color: var(--hp-grammar); }
@@ -276,7 +280,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 
 /* ---------------------------------------------------------------- problems panel */
 
-#problems { flex: 0 0 340px; min-width: 0; max-width: 340px; display: flex; flex-direction: column; min-height: 0; background: var(--chrome); border-left: 1px solid var(--border); }
+#problems { flex: 0 0 var(--problems-w); min-width: 0; max-width: var(--problems-w); display: flex; flex-direction: column; min-height: 0; background: var(--chrome); border-left: 1px solid var(--border); }
 #problems > header { display: flex; align-items: center; justify-content: space-between; padding: 10px 10px 6px 14px; font-weight: 600; }
 #problem-filters { display: flex; gap: 6px; padding: 0 12px 10px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
 .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; font-size: 12px; color: var(--muted); background: var(--bg-raised); }
@@ -306,7 +310,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 /* ---------------------------------------------------------------- quick fix */
 
 #quickfix {
-  position: fixed; z-index: 40; min-width: 260px; max-width: 440px; padding: 5px;
+  position: fixed; z-index: 40; min-width: min(260px, calc(100vw - 16px)); max-width: min(440px, calc(100vw - 16px)); padding: 5px;
   background: var(--bg-raised); border: 1px solid var(--border); border-radius: 9px; box-shadow: var(--shadow);
 }
 .qf-head { padding: 6px 9px 8px; color: var(--muted); font-size: 12px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
@@ -320,7 +324,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 /* ---------------------------------------------------------------- recent files */
 
 #recent {
-  position: fixed; z-index: 40; min-width: 280px; max-width: 460px; padding: 5px;
+  position: fixed; z-index: 40; min-width: min(280px, calc(100vw - 16px)); max-width: min(460px, calc(100vw - 16px)); padding: 5px;
   background: var(--bg-raised); border: 1px solid var(--border); border-radius: 9px; box-shadow: var(--shadow);
 }
 .rc-head { padding: 6px 9px 8px; color: var(--muted); font-size: 12px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
@@ -347,14 +351,14 @@ button:disabled { opacity: 0.45; cursor: default; }
 /* ---------------------------------------------------------------- toasts */
 
 #toasts { position: fixed; right: 16px; bottom: 40px; display: flex; flex-direction: column; gap: 8px; z-index: 60; pointer-events: none; }
-.toast { background: var(--heading); color: var(--bg); padding: 8px 14px; border-radius: 8px; box-shadow: var(--shadow); animation: toast-in 0.18s ease-out; transition: opacity 0.3s, transform 0.3s; max-width: 420px; }
+.toast { background: var(--heading); color: var(--bg); padding: 8px 14px; border-radius: 8px; box-shadow: var(--shadow); animation: toast-in 0.18s ease-out; transition: opacity 0.3s, transform 0.3s; max-width: min(420px, calc(100vw - 32px)); }
 .toast.out { opacity: 0; transform: translateY(6px); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 
 /* ---------------------------------------------------------------- settings */
 
 dialog#settings {
-  width: min(640px, calc(100vw - 40px)); max-height: calc(100vh - 60px); padding: 0; display: none;
+  width: min(640px, calc(100vw - 24px)); max-height: calc(100vh - 40px); padding: 0; display: none;
   background: var(--bg-raised); color: var(--fg); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
 }
 dialog#settings[open] { display: flex; flex-direction: column; }
@@ -363,10 +367,10 @@ dialog#settings > header { display: flex; align-items: center; justify-content: 
 dialog#settings h2 { margin: 0; font-size: 16px; }
 .settings-body { overflow-y: auto; padding: 4px 22px 22px; }
 .settings-body h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 22px 0 10px; }
-.field { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 5px 0; }
+.field { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 5px 0; }
 .field.check { justify-content: flex-start; gap: 10px; cursor: pointer; }
 .field input[type="text"], .field input[type="number"], .field select, .row input {
-  background: var(--bg-sunk); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; min-width: 200px;
+  background: var(--bg-sunk); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; min-width: min(200px, 100%);
 }
 .field input[type="number"] { min-width: 80px; width: 80px; }
 .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
@@ -393,6 +397,8 @@ dialog#settings h2 { margin: 0; font-size: 16px; }
   max-width: 780px; margin: 0 auto; padding: 36px 44px 30vh;
   font: 16px/1.7 var(--sans); color: var(--fg); word-wrap: break-word;
 }
+@container (max-width: 560px) { .markdown-body { padding: 24px 18px 30vh; } }
+@container (max-width: 400px) { .markdown-body { font-size: 15px; padding: 18px 14px 30vh; } }
 .markdown-body > :first-child { margin-top: 0; }
 .markdown-body .empty { color: var(--faint); font-style: italic; }
 .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 {
@@ -474,4 +480,47 @@ dialog#settings h2 { margin: 0; font-size: 16px; }
 #reader .rd-status {
   min-width: 0; max-width: 340px; padding: 0 6px; color: var(--faint); font-size: 12px;
   font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ---------------------------------------------------------------- narrow windows */
+
+/* Below 760px the editor and preview stack instead of sitting side by side,
+   and the problems panel floats over the page rather than taking a column of
+   it. --ratio keeps its meaning (the editor's share) across both layouts;
+   initDivider in main.ts reads the flex direction to drag along the right axis. */
+@media (max-width: 760px) {
+  #topbar { gap: 8px; padding: 0 6px; }
+  #doc-dir { display: none; }
+
+  #workspace[data-view="split"] { flex-direction: column; }
+  #workspace[data-view="split"] #editor-pane { flex: 0 0 calc(100% * var(--ratio) - 3px); width: 100%; height: auto; }
+  #workspace[data-view="split"] #preview-pane { width: 100%; }
+  #workspace[data-view="split"] #divider { cursor: row-resize; border-left: none; border-top: 1px solid var(--border); }
+  body.dragging.dragging-rows { cursor: row-resize; }
+
+  #workspace.with-problems { --problems-w: 0px; }
+  #problems {
+    position: absolute; z-index: 15; top: 0; right: 0; bottom: 0; flex: none;
+    width: min(340px, 85%); max-width: none; box-shadow: var(--shadow);
+  }
+
+  #find { left: 10px; right: 10px; }
+  #find input { flex: 1 1 auto; width: auto; min-width: 0; }
+  .find-count { min-width: 0; }
+}
+
+@media (max-width: 600px) {
+  #topbar { gap: 6px; }
+  #topbar .group { gap: 2px; }
+  #problems-label { display: none; }
+  #btn-problems { padding: 4px 8px; }
+  .seg { margin-right: 2px; }
+  .seg button { padding: 3px 7px; }
+  #statusbar .group { gap: 10px; }
+  #st-read, #st-eol, #st-lang { display: none; }
+  #reader .rd-status { display: none; }
+  #reader .rd-sep { margin: 0 3px; }
+  #toasts { right: 12px; left: 12px; align-items: flex-end; }
+  dialog#settings > header { padding-left: 14px; }
+  .settings-body { padding: 4px 14px 16px; }
 }

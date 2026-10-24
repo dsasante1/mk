@@ -305,18 +305,28 @@ function initDivider() {
   const div = $("divider");
   div.addEventListener("pointerdown", (e) => {
     div.setPointerCapture(e.pointerId);
-    document.body.classList.add("dragging");
     const ws = $("workspace");
+    // Narrow windows stack the panes (styles.css), so the drag runs down the
+    // page; the problems panel floats there and takes no width from the panes.
+    const stacked = getComputedStyle(ws).flexDirection === "column";
+    document.body.classList.add("dragging");
+    document.body.classList.toggle("dragging-rows", stacked);
     const move = (ev: PointerEvent) => {
       const rect = ws.getBoundingClientRect();
-      const problems = settings.problemsOpen ? $("problems").getBoundingClientRect().width : 0;
-      settings.split = (ev.clientX - rect.left) / Math.max(1, rect.width - problems);
+      if (stacked) {
+        settings.split = (ev.clientY - rect.top) / Math.max(1, rect.height);
+      } else {
+        const problems = $("problems");
+        const column = settings.problemsOpen && getComputedStyle(problems).position !== "absolute";
+        const taken = column ? problems.getBoundingClientRect().width : 0;
+        settings.split = (ev.clientX - rect.left) / Math.max(1, rect.width - taken);
+      }
       applySplit();
     };
     const up = () => {
       div.removeEventListener("pointermove", move);
       div.removeEventListener("pointerup", up);
-      document.body.classList.remove("dragging");
+      document.body.classList.remove("dragging", "dragging-rows");
       saveSettingsSoon();
       editor.view.requestMeasure();
     };
