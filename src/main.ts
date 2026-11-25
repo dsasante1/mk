@@ -8,6 +8,7 @@
 import "./styles.css";
 import { Text, type EditorState } from "@codemirror/state";
 import type { EditorView, ViewUpdate } from "@codemirror/view";
+import { redo, undo } from "@codemirror/commands";
 import { nextDiagnostic, previousDiagnostic } from "@codemirror/lint";
 import { closeSearchPanel, openSearchPanel, searchPanelOpen, SearchQuery, setSearchQuery } from "@codemirror/search";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -22,7 +23,9 @@ import { Editor } from "./editor";
 import { FindBar, findHighlight } from "./find";
 import { Grammar, groupOf, GROUP_LABEL, ruleLabel, type Group } from "./grammar";
 import { headings } from "./markdown";
-import { Preview } from "./preview";
+import { Mirrors } from "./mirrors";
+import { MAX_PANES, PaneGroup, sanitize, type Dir } from "./panes";
+import { Preview, type PreviewHooks } from "./preview";
 import { Reader, speakingLines, voiceChoices } from "./reader";
 import { SectionNav } from "./section-nav";
 import { SettingsDialog } from "./settings-ui";
@@ -121,6 +124,7 @@ function applySettings(next: Settings) {
   settings = next;
   applyTheme();
   editor?.apply(settings);
+  for (const m of mirrorEditors.values()) m.apply(settings);
   setView(settings.view, false);
   setProblems(settings.problemsOpen, false);
   if (grammar && grammarWas !== settings.grammar) grammar.setEnabled(settings.grammar);
@@ -138,7 +142,7 @@ let grammar: Grammar;
 let reader: Reader;
 let previewTimer: number | undefined;
 
-const preview = new Preview($("preview"), $("preview-pane"), {
+const previewHooks: PreviewHooks = {
   toggleTask(line) {
     const n = line + 1;
     if (n > editor.doc.lines) return;
@@ -149,7 +153,104 @@ const preview = new Preview($("preview"), $("preview-pane"), {
     editor.view.dispatch({ changes: { from: at, to: at + 1, insert: edit.insert }, userEvent: "input.task" });
   },
   openLink: (href) => void followLink(href),
-});
+};
+
+const preview = new Preview($("preview"), $("preview-pane"), previewHooks);
+
+// ---------------------------------------------------------------- split panes
+//
+// Each side can be split into more panes on the same document (panes.ts).
+// Pane 0 on each side is `editor` / `preview`, which everything else talks to;
+// the others are extra views: mirror editors kept in step with the primary
+// (mirrors.ts), and previews rendered from the same text, each scrolled on
+// its own.
+
+let editorPanes: PaneGroup;
+let previewPanes: PaneGroup;
+const extraPreviews = new Map<number, Preview>();
+const mirrorEditors = new Map<number, Editor>();
+const mirrors = new Mirrors(() => editor.view);
+/** The side last clicked or typed in: where Ctrl+\ splits. */
+let lastSide: "editor" | "preview" = "editor";
+
+const previews = () => [preview, ...extraPreviews.values()];
+
+function saveLayout() {
+  settings.panes = { editor: editorPanes.current, preview: previewPanes.current };
+  saveSettingsSoon();
+}
+
+function initPanes() {
+  editorPanes = new PaneGroup($("editor-group"), {
+    el: $("editor-pane"),
+    scroller: editor.view.scrollDOM,
+    attached: () => editor.view.requestMeasure(),
+  }, {
+    name: "editor",
+    create(id) {
+      const el = Object.assign(document.createElement("section"), { className: "editor-pane" });
+      const m = new Editor(el, settings, [], {
+        onUpdate() {},
+        // Undo is the primary's: it holds the one history for the document.
+        keys: [
+          { key: "Mod-z", run: () => undo(editor.view) },
+          { key: "Mod-y", run: () => redo(editor.view) },
+          { key: "Mod-Shift-z", run: () => redo(editor.view) },
+        ],
+      }, {
+        history: false,
+        dispatchTransactions(trs, view) {
+          view.update(trs);
+          mirrors.fromMirror(id, trs);
+        },
+      });
+      mirrorEditors.set(id, m);
+      mirrors.add(id, m.view, (text) => m.load(text));
+      return {
+        el,
+        scroller: m.view.scrollDOM,
+        attached: () => m.view.requestMeasure(),
+        destroy() {
+          mirrors.remove(id);
+          mirrorEditors.delete(id);
+          m.view.destroy();
+        },
+      };
+    },
+    opened: (id) => mirrorEditors.get(id)?.view.focus(),
+    changed: saveLayout,
+  });
+
+  previewPanes = new PaneGroup($("preview-group"), { el: $("preview-pane"), scroller: preview.pane }, {
+    name: "preview",
+    create(id) {
+      const pane = Object.assign(document.createElement("section"), { className: "preview-pane" });
+      const article = Object.assign(document.createElement("article"), { className: "markdown-body" });
+      pane.append(article);
+      const p = new Preview(article, pane, previewHooks);
+      p.setDir(preview.directory);
+      if (settings.view !== "edit") p.render(editor.text());
+      extraPreviews.set(id, p);
+      return { el: pane, scroller: pane, destroy: () => extraPreviews.delete(id) };
+    },
+    changed: saveLayout,
+  });
+
+  editorPanes.set(sanitize(settings.panes?.editor));
+  previewPanes.set(sanitize(settings.panes?.preview));
+
+  for (const [side, el] of [["editor", $("editor-group")], ["preview", $("preview-group")]] as const) {
+    el.addEventListener("pointerdown", () => { lastSide = side; }, true);
+    el.addEventListener("focusin", () => { lastSide = side; });
+  }
+}
+
+/** Split the pane last used, on the side last used if both are showing. */
+function splitPane(dir: Dir) {
+  const side = settings.view === "edit" ? "editor" : settings.view === "preview" ? "preview" : lastSide;
+  const g = side === "editor" ? editorPanes : previewPanes;
+  if (!g.split(g.active, dir)) toast(`At most ${MAX_PANES} ${side} panes`);
+}
 
 async function followLink(href: string) {
   if (isExternal(href)) {
@@ -171,7 +272,8 @@ async function followLink(href: string) {
 
 function renderPreview() {
   if (settings.view === "edit") return;
-  preview.render(editor.text());
+  const text = editor.text();
+  for (const p of previews()) p.render(text);
   if (settings.syncScroll && settings.view === "split") syncFrom("editor");
 }
 
@@ -223,6 +325,7 @@ function refresh() {
 }
 
 function onUpdate(u: ViewUpdate) {
+  if (u.docChanged) mirrors.fromPrimary(u.transactions);
   if (u.docChanged) {
     grammar.changed(u.changes);
     window.clearTimeout(previewTimer);
@@ -289,7 +392,10 @@ function setView(v: View, persist = true) {
   }
   applySplit();
   if (v !== "edit") renderPreview();
-  if (v !== "preview") editor?.view.requestMeasure();
+  if (v !== "preview") {
+    editor?.view.requestMeasure();
+    for (const m of mirrorEditors.values()) m.view.requestMeasure();
+  }
   if (editor) findBar.refresh();
   reader?.refresh();
   sectionNav.schedule();
@@ -670,13 +776,15 @@ function stash() {
 function showDoc() {
   // Reading belongs to a document; another one in the window ends it.
   reader?.stop();
-  preview.setDir(doc.path ? dirName(doc.path) : null);
+  for (const p of previews()) p.setDir(doc.path ? dirName(doc.path) : null);
+  // Extra preview panes start a new document at its top; pane 0 has its tab's place.
+  for (const p of extraPreviews.values()) p.pane.scrollTop = 0;
   hideBanner();
   updateTitle();
   updateStatus();
   void grammar.reset(doc.path);
   window.clearTimeout(previewTimer);
-  if (settings.view !== "edit") preview.render(editor.text());
+  if (settings.view !== "edit") for (const p of previews()) p.render(editor.text());
   sectionNav.set(headings(editor.text()));
   findBar.refresh();
   editor.view.focus();
@@ -818,7 +926,7 @@ async function saveAs(): Promise<boolean> {
   if (ok && path !== was) rememberRecent(path);
   // A tab in the background picks its new folder up when it is shown.
   if (ok && path !== was && t === doc) {
-    preview.setDir(dirName(path));
+    for (const p of previews()) p.setDir(dirName(path));
     void grammar.reset(path);
     renderPreview();
     findBar.refresh();
@@ -1008,6 +1116,7 @@ function onKey(e: KeyboardEvent) {
   if (mod && !e.shiftKey && (e.key === "1" || e.key === "2" || e.key === "3")) {
     stop(); setView((["edit", "split", "preview"] as View[])[Number(e.key) - 1]); return;
   }
+  if (mod && !e.altKey && e.code === "Backslash") { stop(); splitPane(e.shiftKey ? "column" : "row"); return; }
   if (mod && e.shiftKey && k === "m") { stop(); setProblems(!settings.problemsOpen); return; }
   if (mod && e.shiftKey && k === "v") { stop(); setView(settings.view === "preview" ? "split" : "preview"); return; }
   if (mod && (e.key === "=" || e.key === "+")) { stop(); zoom(1); return; }
@@ -1052,6 +1161,7 @@ async function boot() {
   editor = new Editor($("editor-pane"), settings, [findHighlight, speakingLines], {
     onUpdate,
     keys: [],
+    replaced: () => mirrors.resetAll(),
   });
   grammar = new Grammar(() => editor.view, {
     path: () => doc.path,
@@ -1138,6 +1248,7 @@ async function boot() {
     b.onclick = () => setView(b.dataset.view as View);
   }
   initDivider();
+  initPanes();
 
   editor.view.scrollDOM.addEventListener("scroll", () => onScroll("editor", editor.view.scrollDOM), { passive: true });
   preview.pane.addEventListener("scroll", () => onScroll("preview", preview.pane), { passive: true });

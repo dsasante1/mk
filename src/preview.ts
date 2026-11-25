@@ -80,8 +80,10 @@ export class Preview {
   scrollToAnchor(id: string) {
     let name = id;
     try { name = decodeURIComponent(id); } catch { /* as written */ }
-    const el = document.getElementById(ID_PREFIX + name) ?? document.getElementById(name);
-    if (el) this.pane.scrollTo({ top: el.offsetTop - 16, behavior: "smooth" });
+    // Looked up in this preview, not the page: split preview panes repeat every id.
+    const byId = (id: string) => this.el.querySelector<HTMLElement>(`[id="${CSS.escape(id)}"]`);
+    const el = byId(ID_PREFIX + name) ?? byId(name);
+    if (el) this.pane.scrollTo({ top: this.top(el) - 16, behavior: "smooth" });
   }
 
   get directory() { return this.dir; }
