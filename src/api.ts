@@ -53,6 +53,8 @@ export interface Settings {
   speechSkipCode: boolean;
   /** The piper program; "" means look in the usual places. */
   speechPiper: string;
+  /** How the editor and preview sides are split into panes (panes.ts); checked on load. */
+  panes?: { editor?: unknown; preview?: unknown };
   // Keys a newer build wrote ride along untouched.
   [extra: string]: unknown;
 }

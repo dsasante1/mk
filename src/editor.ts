@@ -5,7 +5,9 @@
 // live in a compartment so a font change is a reconfigure, not a new state —
 // a new state would throw the undo history away with it.
 
-import { EditorState, Compartment, EditorSelection, type Extension, type TransactionSpec, type Text } from "@codemirror/state";
+import {
+  EditorState, Compartment, EditorSelection, type Extension, type TransactionSpec, type Text, type Transaction,
+} from "@codemirror/state";
 import {
   EditorView, keymap, drawSelection, dropCursor, highlightActiveLine, highlightSpecialChars,
   rectangularSelection, crosshairCursor, lineNumbers, placeholder, type ViewUpdate, type Command,
@@ -129,6 +131,14 @@ const run = (f: (s: EditorState) => TransactionSpec): Command => (view) => {
 export interface EditorHooks {
   onUpdate(u: ViewUpdate): void;
   keys: { key: string; run: Command; shift?: Command; preventDefault?: boolean }[];
+  /** The whole state was swapped (a new document, another tab): not an update. */
+  replaced?(): void;
+}
+
+export interface EditorOptions {
+  /** Off for a pane that mirrors another editor: undo belongs to the one it mirrors. */
+  history?: boolean;
+  dispatchTransactions?(trs: readonly Transaction[], view: EditorView): void;
 }
 
 function settingsExt(s: Settings): Extension[] {
@@ -148,10 +158,12 @@ export class Editor {
   readonly view: EditorView;
   private settingsComp = new Compartment();
   private extra: Extension[];
+  private history: boolean;
 
-  constructor(parent: HTMLElement, settings: Settings, extra: Extension[], private hooks: EditorHooks) {
+  constructor(parent: HTMLElement, settings: Settings, extra: Extension[], private hooks: EditorHooks, opts: EditorOptions = {}) {
     this.extra = extra;
-    this.view = new EditorView({ parent, state: this.state("", settings) });
+    this.history = opts.history ?? true;
+    this.view = new EditorView({ parent, state: this.state("", settings), dispatchTransactions: opts.dispatchTransactions });
   }
 
   private settings: Settings | null = null;
@@ -162,7 +174,7 @@ export class Editor {
       doc,
       extensions: [
         highlightSpecialChars(),
-        history(),
+        ...(this.history ? [history()] : []),
         drawSelection(),
         dropCursor(),
         EditorState.allowMultipleSelections.of(true),
@@ -202,6 +214,7 @@ export class Editor {
   /** A new document is a new state, so undo cannot walk into the last file. */
   load(text: string) {
     this.view.setState(this.state(text, this.settings!));
+    this.hooks.replaced?.();
   }
 
   /**
@@ -223,6 +236,7 @@ export class Editor {
   restore(state: EditorState) {
     this.view.setState(state);
     this.apply(this.settings!);
+    this.hooks.replaced?.();
   }
 
   get doc(): Text { return this.view.state.doc; }

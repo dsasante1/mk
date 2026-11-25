@@ -37,6 +37,8 @@ On a Mac, the keys below use Cmd where they say Ctrl.
 
 **Viewing.** A live preview with GitHub-flavoured rendering: tables, task lists, strikethrough, autolinks, heading anchors, highlighted code, raw HTML (sanitised) and front matter. Images next to the document load from disk. The preview scrolls in step with the editor. You can tick a task in the preview and the editor changes with it. A link to another Markdown file opens that file in mk.
 
+**Split panes.** The editor and the preview can each be split into more panes showing the same document, so you can read or write one part while looking at another. Hover over a pane and use its buttons to split it right or down, or press Ctrl+\\ (right) or Ctrl+Shift+\\ (down) to split the pane you last clicked. Split a pane again, either way, to build a grid of up to six panes on each side. Drag the line between two panes to resize them; double-click it to make them even. Every pane scrolls on its own. Text typed in any editor pane appears in all of them at once, and Ctrl+Z undoes it from any pane. Harper's underlines, find, and scroll sync stay with the first editor and preview pane. The layout is kept across restarts. Close an extra pane with its × button.
+
 **Several files at once.** Each open file gets a tab. Open several from the Open dialog, the command line or by dropping them on the window. A file that is already open is not opened twice. Each tab keeps its own undo history, cursor and scroll position. Click a tab or press Ctrl+Tab to switch between them. Click a tab's × (or middle-click the tab, or press Ctrl+W) to close it. A tab with unsaved changes shows a dot in place of the × and asks before it closes. Closing the window asks about every unsaved tab in turn.
 
 **Recent files.** The clock button in the top bar (or Ctrl+Shift+O) drops down the files you opened most recently, newest first, each with its folder. Click one — or use the arrow keys and Enter — to open it; Esc closes the menu. The list is kept across restarts and shared between windows, and "Clear recent files" empties it.
@@ -112,6 +114,7 @@ Everything else about an untrusted document is contained. Raw HTML in the previe
 | Ctrl+W | Close tab |
 | Ctrl+1 / Ctrl+2 / Ctrl+3 | Editor only, split, preview only |
 | Ctrl+Shift+V | Toggle preview only |
+| Ctrl+\\ / Ctrl+Shift+\\ | Split the pane you last used right / down |
 | Ctrl+Shift+M | Harper issues panel |
 | Ctrl+. | Quick fix at the cursor (1–9 picks, Enter applies, Esc closes) |
 | F8 / Shift+F8 | Next / previous issue |
@@ -175,6 +178,7 @@ cargo test --manifest-path src-tauri/Cargo.toml    # Harper bridge, settings, CL
 | `src/grammar.ts` | When to lint and how to show the results. Edits made while a lint is running are mapped onto its results, so underlines never land on the wrong words. |
 | `src/editor.ts` | CodeMirror setup and the formatting commands. |
 | `src/markdown.ts`, `src/preview.ts` | Rendering with source-line anchors, sanitising, images, links and scroll sync. |
+| `src/panes.ts`, `src/mirrors.ts` | Split panes: the layout tree and how it is drawn and resized, and extra editor panes kept in step with the first one, which holds the one undo history. |
 | `src/section-nav.ts` | The section rail: which heading you are under, and jumping between them. |
 | `src/reader.ts` | Read aloud: the sentences of the rendered page and their highlights, where to start, the player bar. |
 | `src/speech-text.ts`, `src/speech-rules.ts` | Splitting text into sentences, and the speech rules file with the built-in clean-up. |

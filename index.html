@@ -36,9 +36,13 @@
       <nav id="tabs" role="tablist" aria-label="Open files"></nav>
       <div id="banner" hidden></div>
       <main id="workspace" data-view="split">
-        <section id="editor-pane"></section>
+        <div id="editor-group" class="pane-group">
+          <section id="editor-pane" class="editor-pane"></section>
+        </div>
         <div id="divider" role="separator" aria-orientation="vertical"></div>
-        <section id="preview-pane"><article id="preview" class="markdown-body"></article></section>
+        <div id="preview-group" class="pane-group">
+          <section id="preview-pane" class="preview-pane"><article id="preview" class="markdown-body"></article></section>
+        </div>
         <nav id="section-nav"></nav>
         <div id="find"></div>
         <div id="reader" hidden></div>
